@@ -14,7 +14,7 @@ const MAX_PRICE = 50
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
-var wathcerId []int
+var lastItemId int = 13187290490
 
 func UnmarshalCatalog(responseRaw []byte) *ItemDetail {
 	itemDetail := &ItemDetail{}
@@ -55,7 +55,7 @@ func GetCsrfToken() string {
 
 func ItemRecentlyAdded() ([]byte, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	response, err := client.Get("https://catalog.roblox.com/v1/search/items?category=All&includeNotForSale=true&limit=10&salesTypeFilter=2&sortType=3")
+	response, err := client.Get("https://catalog.roblox.com/v1/search/items?category=All&includeNotForSale=true&limit=120&salesTypeFilter=2&sortType=3")
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -75,10 +75,11 @@ func ItemRecentlyAddedAppend() (int, error) {
 		return 0, err
 	}
 
+	listId = nil
+
 	listItems := UnmarshalCatalog(responseListItems)
 	for _, data := range listItems.Detail {
 		listId = append(listId, data.Id)
-		fmt.Println(data.Id)
 	}
 
 	return listItems.Detail[0].Id, nil
@@ -136,84 +137,6 @@ func ItemThumbnailImageById(assetId int) (string, error) {
 	return data.Detail[0].Image, nil
 }
 
-func AddToWatcher() {
-	for {
-		lastId, err := ItemRecentlyAddedAppend()
-		if err != nil {
-			fmt.Println("Trying to recovery too many request...")
-			time.Sleep(15 * time.Second)
-			fmt.Println("Sleep done, lets see if it works...")
-			continue
-		}
-
-		if listId[0] == lastId {
-			continue
-		}
-
-		fmt.Println(lastId)
-		time.Sleep(3 * time.Second)
-	}
-}
-
-func NotifierWatcher(notifierType string, data Data) error {
-	switch notifierType {
-	case "free":
-		client := &http.Client{Timeout: 5 * time.Second}
-
-		webhookBuilder := fmt.Sprintf(`{
-		  "content": null,
-		  "embeds": [
-			{
-			  "title": "%s",
-			  "url": "https://www.roblox.com/catalog/%d/",
-			  "color": 4628704,
-			  "fields": [
-				{
-				  "name": "Price",
-				  "value": "%d",
-				  "inline": true
-				},
-				{
-				  "name": "Quantity",
-				  "value": "%d",
-				  "inline": true
-				},
-				{
-				  "name": "Item Id",
-				  "value": "%d"
-				}
-			  ],
-			  "thumbnail": {
-				"url": "%s"
-			  }
-			}
-		  ],
-		  "username": "Test",
-		  "attachments": []
-		}`, data.Name, data.Id, data.Price, data.Quantity, data.Id, data.Image)
-		dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
-
-		req, err := http.NewRequest("POST", "https://discord.com/api/webhooks/1098275385801719919/r24Vz-TimcV2baMCMKbeuDsJGmR-wWCZYOb_vlkTts5jCFPiT1jU4DDqDyhSiATHfYWw", dataRequest)
-		if err != nil {
-			fmt.Println(err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		response, err := client.Do(req)
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer response.Body.Close()
-		if response.StatusCode != 200 {
-			return errors.New("string code is not 200")
-		}
-		break
-	case "paid":
-		break
-	}
-	return nil
-}
-
 func main() {
-
+	AddToWatcher()
 }

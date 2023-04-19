@@ -36,16 +36,3 @@ func TestItemThumbnailImageById(t *testing.T) {
 	thumbnailUrl, _ := ItemThumbnailImageById(13177094956)
 	t.Log(thumbnailUrl)
 }
-
-func TestAddToWatcher(t *testing.T) {
-	//AddToWatcher()
-}
-
-func TestNotifierWatcher(t *testing.T) {
-	data, _ := ItemDetailById(13177094956)
-	data.Detail[0].Image, _ = ItemThumbnailImageById(13177094956)
-	err := NotifierWatcher("free", data.Detail[0])
-	if err != nil {
-		t.Log(err)
-	}
-}
