@@ -28,7 +28,7 @@ func TestItemDetailById(t *testing.T) {
 }
 
 func TestItemRecentlyAddedAppend(t *testing.T) {
-	listItems, _ := ItemRecentlyAddedAppend()
+	listItems, _ := ItemRecentlyAddedAppend(ItemRecentlyAdded())
 	fmt.Println(listItems)
 }
 

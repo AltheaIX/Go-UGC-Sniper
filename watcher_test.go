@@ -7,7 +7,7 @@ import (
 )
 
 func TestAddToWatcher(t *testing.T) {
-	//AddToWatcher()
+	AddToWatcher()
 }
 
 func TestNotifierWatcher(t *testing.T) {
@@ -21,4 +21,8 @@ func TestNotifierWatcher(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
+}
+
+func TestProxyRequest(t *testing.T) {
+	ProxyRequest()
 }

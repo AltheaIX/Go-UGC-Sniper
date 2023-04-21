@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
+	"golang.org/x/net/proxy"
 	"io"
+	"math/rand"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -14,7 +18,7 @@ const MAX_PRICE = 50
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
-var lastItemId int = 13187290490
+var lastItemId int = 13197718725
 
 func UnmarshalCatalog(responseRaw []byte) *ItemDetail {
 	itemDetail := &ItemDetail{}
@@ -54,11 +58,31 @@ func GetCsrfToken() string {
 }
 
 func ItemRecentlyAdded() ([]byte, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
+	ReadProxyFromFile("proxy_fresh")
+	proxyURL, err := url.Parse("socks5://" + proxyList[rand.Intn(len(proxyList))])
+	if err != nil {
+		fmt.Println("error on parser.")
+		panic(err)
+	}
+
+	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
+	if err != nil {
+		fmt.Println("error on dialer.")
+		panic(err)
+	}
+
+	transport := &http.Transport{
+		Dial:            dialer.Dial,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
+	}
+
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
 	response, err := client.Get("https://catalog.roblox.com/v1/search/items?category=All&includeNotForSale=true&limit=120&salesTypeFilter=2&sortType=3")
 	if err != nil {
 		fmt.Print(err)
+		return nil, err
 	}
+
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		return nil, errors.New("status code is not 200")
@@ -69,15 +93,14 @@ func ItemRecentlyAdded() ([]byte, error) {
 	return scanner, nil
 }
 
-func ItemRecentlyAddedAppend() (int, error) {
-	responseListItems, err := ItemRecentlyAdded()
+func ItemRecentlyAddedAppend(scanner []byte, err error) (int, error) {
 	if err != nil {
 		return 0, err
 	}
 
 	listId = nil
 
-	listItems := UnmarshalCatalog(responseListItems)
+	listItems := UnmarshalCatalog(scanner)
 	for _, data := range listItems.Detail {
 		listId = append(listId, data.Id)
 	}

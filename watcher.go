@@ -15,19 +15,16 @@ var newItemId []int
 
 func AddToWatcher() {
 	for {
-		lastIdFromArray, err := ItemRecentlyAddedAppend()
+		lastIdFromArray, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
 		newItemId = nil
 
 		if err != nil {
-			fmt.Println("Trying to recovery too many request...")
-			time.Sleep(15 * time.Second)
-			fmt.Println("Sleep done, lets see if it works...")
+			fmt.Println("Proxy error, retrying with another proxy.")
 			continue
 		}
 
 		if lastItemId == lastIdFromArray {
 			fmt.Println("No news items yet...")
-			fmt.Println(newItemId)
 			continue
 		}
 
@@ -166,7 +163,6 @@ func NotifierWatcherHandle(newItemId []int) {
 			detail, err := ItemDetailById(data)
 			if err != nil {
 				fmt.Println(err)
-				time.Sleep(15 * time.Second)
 				continue
 			}
 
@@ -180,12 +176,12 @@ func NotifierWatcherHandle(newItemId []int) {
 
 			if detail.Detail[0].Price != 0 {
 				go NotifierWatcher("paid", detail.Detail[0])
-				fmt.Printf("Webhook sent to for %d", data)
+				fmt.Printf("Webhook sent to for %d \n", data)
 				break
 			}
 
 			go NotifierWatcher("free", detail.Detail[0])
-			fmt.Printf("Webhook sent to for %d", data)
+			fmt.Printf("Webhook sent to for %d \n", data)
 			break
 		}
 	}
