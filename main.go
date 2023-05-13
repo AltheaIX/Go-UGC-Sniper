@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"errors"
@@ -18,33 +19,41 @@ const MAX_PRICE = 50
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
-var lastItemId int = 13197718725
+var lastItemId int
 
-func UnmarshalCatalog(responseRaw []byte) *ItemDetail {
-	itemDetail := &ItemDetail{}
+func ResponseReader(response *http.Response) ([]byte, error) {
+	var body []byte
+	var err error
 
-	err := json.Unmarshal(responseRaw, &itemDetail)
-	if err != nil {
-		fmt.Println(err)
+	reader := bufio.NewReaderSize(response.Body, 4096*2)
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		if err != nil && err != io.EOF {
+			fmt.Printf("Error: %v - Response Reader\n", err)
+		}
+		body = append(body, chunk...)
+		if err == io.EOF {
+			break
+		}
 	}
-	return itemDetail
+	return body, err
 }
 
 func GetCsrfToken() string {
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{}
 
 	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
 	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error: %v - GetCsrfToken\n", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	response, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error: %v - GetCsrfToken\n", err)
 	}
 	defer response.Body.Close()
 
@@ -61,13 +70,13 @@ func ItemRecentlyAdded() ([]byte, error) {
 	ReadProxyFromFile("proxy_fresh")
 	proxyURL, err := url.Parse("socks5://" + proxyList[rand.Intn(len(proxyList))])
 	if err != nil {
-		fmt.Println("error on parser.")
+		fmt.Printf("Error: %v - Parser Proxy\n", err)
 		panic(err)
 	}
 
 	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
 	if err != nil {
-		fmt.Println("error on dialer.")
+		fmt.Printf("Error: %v - Dialer Proxy\n", err)
 		panic(err)
 	}
 
@@ -76,10 +85,9 @@ func ItemRecentlyAdded() ([]byte, error) {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
 	}
 
-	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
 	response, err := client.Get("https://catalog.roblox.com/v1/search/items?category=All&includeNotForSale=true&limit=120&salesTypeFilter=2&sortType=3")
 	if err != nil {
-		fmt.Print(err)
 		return nil, err
 	}
 
@@ -88,8 +96,12 @@ func ItemRecentlyAdded() ([]byte, error) {
 		return nil, errors.New("status code is not 200")
 	}
 
-	scanner, _ := io.ReadAll(response.Body)
-	time.Sleep(2 * time.Second)
+	scanner, _ := ResponseReader(response)
+
+	if string(scanner) == "" {
+		return nil, errors.New("empty body")
+	}
+
 	return scanner, nil
 }
 
@@ -104,41 +116,56 @@ func ItemRecentlyAddedAppend(scanner []byte, err error) (int, error) {
 	for _, data := range listItems.Detail {
 		listId = append(listId, data.Id)
 	}
-
 	return listItems.Detail[0].Id, nil
 }
 
 func ItemDetailById(assetId int) (*ItemDetail, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
 	itemDetail := &ItemDetail{}
+	var err error
+	client := &http.Client{Timeout: 3 * time.Second}
 
 	jsonPayload := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %d}]}`, assetId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-csrf-token", GetCsrfToken())
 
-	response, err := client.Do(req)
+	for {
+
+		response, err := client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		defer response.Body.Close()
+		if response.StatusCode != 200 {
+			err = errors.New("status code is not 200")
+		}
+
+		scanner, _ := ResponseReader(response)
+		itemDetail = UnmarshalCatalog(scanner)
+		break
+	}
+	return itemDetail, err
+}
+
+func UnmarshalCatalog(responseRaw []byte) *ItemDetail {
+	itemDetail := &ItemDetail{}
+
+	err := json.Unmarshal(responseRaw, &itemDetail)
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		return nil, errors.New("status code is not 200")
-	}
-
-	scanner, _ := io.ReadAll(response.Body)
-	itemDetail = UnmarshalCatalog(scanner)
-	time.Sleep(2 * time.Second)
-	return itemDetail, nil
+	return itemDetail
 }
 
 func ItemThumbnailImageById(assetId int) (string, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 3 * time.Second}
 	urlBuilder := fmt.Sprintf("https://thumbnails.roblox.com/v1/assets?assetIds=%d&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false", assetId)
 	data := &ItemDetail{}
 
@@ -151,7 +178,7 @@ func ItemThumbnailImageById(assetId int) (string, error) {
 		return "", errors.New("status code is not 200")
 	}
 
-	scanner, _ := io.ReadAll(response.Body)
+	scanner, _ := ResponseReader(response)
 	err = json.Unmarshal(scanner, &data)
 	if err != nil {
 		return "", err
@@ -161,5 +188,7 @@ func ItemThumbnailImageById(assetId int) (string, error) {
 }
 
 func main() {
+	LoadConfig()
+	ProxyTester()
 	AddToWatcher()
 }

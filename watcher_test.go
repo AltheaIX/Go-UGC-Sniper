@@ -22,7 +22,3 @@ func TestNotifierWatcher(t *testing.T) {
 		t.Log(err)
 	}
 }
-
-func TestProxyRequest(t *testing.T) {
-	ProxyRequest()
-}

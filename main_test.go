@@ -18,7 +18,10 @@ func TestGetCsrfToken(t *testing.T) {
 }
 
 func TestItemRecentlyAdded(t *testing.T) {
-	responseByte, _ := ItemRecentlyAdded()
+	responseByte, err := ItemRecentlyAdded()
+	if err != nil {
+		fmt.Println(err)
+	}
 	fmt.Println(string(responseByte))
 }
 

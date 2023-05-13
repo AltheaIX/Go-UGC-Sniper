@@ -13,6 +13,9 @@ import (
 var watcherId []int
 var newItemId []int
 
+var freeWebhookUrl string
+var paidWebhookUrl string
+
 func AddToWatcher() {
 	for {
 		lastIdFromArray, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
@@ -67,8 +70,11 @@ func NotifierWatcher(notifierType string, data Data) error {
 				},
 				{
 				  "name": "Quantity",
-				  "value": "%d",
-				  "inline": true
+				  "value": "%d"
+				},
+				{
+				  "name": "Available Copy",
+				  "value": "%d"
 				},
 				{
 				  "name": "Item Id",
@@ -82,10 +88,10 @@ func NotifierWatcher(notifierType string, data Data) error {
 		  ],
 		  "username": "Free Item Notifier",
 		  "attachments": []
-		}`, data.Name, data.Id, data.Price, data.Quantity, data.Id, data.Image)
+		}`, data.Name, data.Id, data.Price, data.Quantity, data.UnitsAvailable, data.Id, data.Image)
 		dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
 
-		req, err := http.NewRequest("POST", "https://discord.com/api/webhooks/1098275385801719919/r24Vz-TimcV2baMCMKbeuDsJGmR-wWCZYOb_vlkTts5jCFPiT1jU4DDqDyhSiATHfYWw", dataRequest)
+		req, err := http.NewRequest("POST", freeWebhookUrl, dataRequest)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -118,8 +124,11 @@ func NotifierWatcher(notifierType string, data Data) error {
 				},
 				{
 				  "name": "Quantity",
-				  "value": "%d",
-				  "inline": true
+				  "value": "%d"
+				},
+				{
+				  "name": "Unit Available",
+				  "value": "%d"
 				},
 				{
 				  "name": "Item Id",
@@ -133,10 +142,10 @@ func NotifierWatcher(notifierType string, data Data) error {
 		  ],
 		  "username": "Paid Item Notifier",
 		  "attachments": []
-		}`, data.Name, data.Id, data.Price, data.Quantity, data.Id, data.Image)
+		}`, data.Name, data.Id, data.Price, data.Quantity, data.UnitsAvailable, data.Id, data.Image)
 		dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
 
-		req, err := http.NewRequest("POST", "https://discord.com/api/webhooks/1098275294277816341/obz7AD8ju43-89LRoMVI5YzvN_YL03v1DJvTBCOSX-RbxtBg2Qrg5ZZLddzev1U-ZnBh", dataRequest)
+		req, err := http.NewRequest("POST", paidWebhookUrl, dataRequest)
 		if err != nil {
 			fmt.Println(err)
 		}

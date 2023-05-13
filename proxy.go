@@ -3,11 +3,16 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"golang.org/x/net/proxy"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"runtime"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,11 +30,16 @@ func ReadProxyFromFile(fileName string) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		splitLine := strings.Split(line, ":")
+		re := regexp.MustCompile("[0-9]+")
+		proxyFormat := fmt.Sprintf("%s:%s", splitLine[0], re.FindAllString(splitLine[1], -1)[0])
+
 		if fileName != "proxy_fresh" {
-			newProxy = append(newProxy, line)
+			newProxy = append(newProxy, proxyFormat)
+			continue
 		}
 
-		proxyList = append(proxyList, line)
+		proxyList = append(proxyList, proxyFormat)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -55,48 +65,62 @@ func WriteProxyToFile(proxyList []string) {
 	fmt.Println("Data written to file successfully!")
 }
 
+func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
+	defer wg.Done()
+	proxyURL, err := url.Parse("socks5://" + data)
+	if err != nil {
+		return errors.New("error on parse")
+	}
+
+	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
+	if err != nil {
+		return errors.New("error on dialer")
+	}
+
+	transport := &http.Transport{
+		Dial:            dialer.Dial,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   3 * time.Second,
+	}
+
+	// Use thumbnail because thumbnail no rate limit
+	req, err := http.NewRequest("GET", "https://thumbnails.roblox.com/v1/assets?assetIds=1&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false", nil) // Replace with your target URL
+	if err != nil {
+		return errors.New("error on new request")
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errors.New("error on execute request")
+	}
+	defer resp.Body.Close()
+
+	proxyList = append(proxyList, data)
+	return nil
+}
+
 func ProxyTester() {
+	runtime.GOMAXPROCS(5)
+
+	var wg sync.WaitGroup
+
 	ReadProxyFromFile("proxy")
 	fmt.Println("Checking proxy, we use 3s timeout for this checker to make sure proxy are fresh and fast.")
 	for _, data := range newProxy {
-		proxyURL, err := url.Parse("socks5://" + data)
-		fmt.Println(proxyURL)
-		if err != nil {
-			fmt.Println("error on parser.")
-			panic(err)
-		}
+		proxyData := data
 
-		dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-		if err != nil {
-			fmt.Println("error on dialer.")
-			panic(err)
-		}
-
-		transport := &http.Transport{
-			Dial:            dialer.Dial,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
-		}
-
-		client := &http.Client{
-			Transport: transport,
-			Timeout:   3 * time.Second,
-		}
-
-		req, err := http.NewRequest("GET", "https://thumbnails.roblox.com/v1/assets?assetIds=1&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false", nil) // Replace with your target URL
-		if err != nil {
-			fmt.Println("error on new request.")
-			continue
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("error on execute request.")
-			continue
-		}
-		defer resp.Body.Close()
-
-		proxyList = append(proxyList, data)
+		wg.Add(1)
+		go func() {
+			CheckRequestProxy(&wg, proxyData)
+		}()
 	}
+
+	wg.Wait()
+	fmt.Println(proxyList)
 	WriteProxyToFile(proxyList)
 	fmt.Println("Proxy checker success, all fresh proxy are on proxy_fresh.txt")
 }
