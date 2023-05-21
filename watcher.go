@@ -6,51 +6,92 @@ import (
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"net/http"
+	"os"
+	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
 var watcherId []int
 var newItemId []int
+var sentWebhookItemId = make(map[int]bool)
+
+var notificationMutex sync.Mutex
 
 var freeWebhookUrl string
 var paidWebhookUrl string
+var threads int
 
-func AddToWatcher() {
+func AddToWatcher(sig chan os.Signal) {
+	semaphore := make(chan struct{}, threads)
+	go OffsaleTrackerHandler()
+	go SniperHandler()
 	for {
-		lastIdFromArray, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
-		newItemId = nil
+		select {
+		case <-sig:
+			fmt.Println("Termination signal received.")
+			return
+		default:
+			semaphore <- struct{}{}
+			go func(semaphore chan struct{}, newItemId []int) {
+				defer func() {
+					<-semaphore
+				}()
+				lastIdFromArray, proxyURL, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
 
-		if err != nil {
-			fmt.Println("Proxy error, retrying with another proxy.")
-			continue
+				if err != nil {
+					if strings.Contains(err.Error(), "context deadline exceeded") {
+						fmt.Printf("%v - Proxy timeout.\n", proxyURL)
+						return
+					}
+
+					if strings.Contains(err.Error(), "status code is not 200") {
+						fmt.Printf("%v - Rate limited.\n", proxyURL)
+						return
+					}
+
+					if strings.ContainsAny(err.Error(), "An existing connection was forcibly closed by the remote host.") {
+						fmt.Printf("%v - Proxy issues, i suggest you to enable Always Check Proxy on config.json\n", proxyURL)
+						return
+					}
+
+					fmt.Printf("%v - %v\n", proxyURL, err.Error())
+					return
+				}
+
+				if lastItemId == lastIdFromArray {
+					fmt.Printf("%v - No news items yet.\n", proxyURL)
+					return
+				}
+
+				var idsToAdd []int
+				for _, data := range listId {
+					if data == lastItemId {
+						break
+					}
+
+					idsToAdd = append(idsToAdd, data)
+				}
+
+				if len(idsToAdd) > 0 {
+					notificationMutex.Lock()
+					defer notificationMutex.Unlock()
+					go NotifierWatcherHandler(idsToAdd)
+				}
+
+				lastItemId = lastIdFromArray
+			}(semaphore, newItemId[:])
+			newItemId = nil
 		}
-
-		if lastItemId == lastIdFromArray {
-			fmt.Println("No news items yet...")
-			continue
-		}
-
-		for _, data := range listId {
-			if data == lastItemId {
-				break
-			}
-
-			watcherId = append(watcherId, data)
-			newItemId = append(newItemId, data)
-		}
-		fmt.Println(watcherId)
-
-		if newItemId != nil {
-			go NotifierWatcherHandle(newItemId)
-		}
-
-		lastItemId = lastIdFromArray
-		time.Sleep(3 * time.Second)
 	}
 }
 
 func NotifierWatcher(notifierType string, data Data) error {
+	if sentWebhookItemId[data.Id] != false {
+		return nil
+	}
+
 	switch notifierType {
 	case "free":
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -166,13 +207,24 @@ func NotifierWatcher(notifierType string, data Data) error {
 	return nil
 }
 
-func NotifierWatcherHandle(newItemId []int) {
-	for _, data := range newItemId {
+func OffsaleTracker(offsaleId []int) {
+	for _, data := range offsaleId {
 		for {
 			detail, err := ItemDetailById(data)
 			if err != nil {
-				fmt.Println(err)
 				continue
+			}
+
+			if detail.Detail[0].PriceStatus == "Off Sale" && detail.Detail[0].Quantity == 0 {
+				fmt.Printf("Watcher - %d still on offsale.\n", data)
+				break
+			}
+
+			DeleteIntSlice(watcherId, data)
+
+			if detail.Detail[0].Quantity == 0 {
+				fmt.Printf("Watcher - %d will be removed from watcher list.\n", data)
+				break
 			}
 
 			detail.Detail[0].Image, err = ItemThumbnailImageById(data)
@@ -186,11 +238,85 @@ func NotifierWatcherHandle(newItemId []int) {
 			if detail.Detail[0].Price != 0 {
 				go NotifierWatcher("paid", detail.Detail[0])
 				fmt.Printf("Webhook sent to for %d \n", data)
+				sentWebhookItemId[detail.Detail[0].Id] = true
 				break
 			}
 
 			go NotifierWatcher("free", detail.Detail[0])
+			listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
 			fmt.Printf("Webhook sent to for %d \n", data)
+			sentWebhookItemId[detail.Detail[0].Id] = true
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func OffsaleTrackerHandler() {
+	fmt.Println("System - Offsale Tracker activated.")
+	for {
+		OffsaleTracker(watcherId)
+	}
+}
+
+func IsFieldSet(s interface{}, fieldName string) bool {
+	v := reflect.ValueOf(s)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return false
+	}
+
+	zeroValue := reflect.Zero(field.Type())
+
+	return !reflect.DeepEqual(field.Interface(), zeroValue.Interface())
+}
+
+func NotifierWatcherHandler(newItemId []int) {
+	for _, data := range newItemId {
+		for {
+			defer func(data int) {
+				if err := recover(); err != nil {
+					fmt.Printf("Recovered from panic: %v\n", err)
+				}
+			}(data)
+
+			detail, err := ItemDetailById(data)
+			if err != nil {
+				continue
+			}
+
+			if detail.Detail[0].PriceStatus == "Off Sale" && detail.Detail[0].Quantity == 0 {
+				watcherId = append(watcherId, data)
+				break
+			}
+
+			if detail.Detail[0].Quantity == 0 {
+				break
+			}
+
+			detail.Detail[0].Image, err = ItemThumbnailImageById(data)
+			_name := strings.Replace(string(detail.Detail[0].Name), `"`, "", 2)
+			detail.Detail[0].Name = jsoniter.RawMessage(_name)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			if detail.Detail[0].Price != 0 {
+				go NotifierWatcher("paid", detail.Detail[0])
+				fmt.Printf("Notifier - Webhook sent to for %d \n", data)
+				sentWebhookItemId[detail.Detail[0].Id] = true
+				break
+			}
+
+			go NotifierWatcher("free", detail.Detail[0])
+			listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
+			fmt.Printf("Notifier - Webhook sent to for %d \n", data)
+			sentWebhookItemId[detail.Detail[0].Id] = true
 			break
 		}
 	}

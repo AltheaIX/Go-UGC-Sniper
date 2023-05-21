@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime"
 	"strings"
@@ -18,8 +19,9 @@ import (
 
 var proxyList []string
 var newProxy []string
+var checkProxy bool
 
-func ReadProxyFromFile(fileName string) {
+func ReadProxyFromFile(fileName string, forced bool) error {
 	file, err := os.Open(fileName + ".txt") // Replace with the path to your file
 	if err != nil {
 		panic(err)
@@ -29,6 +31,10 @@ func ReadProxyFromFile(fileName string) {
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
+		if checkProxy != true && fileName == "proxy_fresh" && forced != true {
+			return errors.New("not empty")
+		}
+
 		line := scanner.Text()
 		splitLine := strings.Split(line, ":")
 		re := regexp.MustCompile("[0-9]+")
@@ -45,6 +51,11 @@ func ReadProxyFromFile(fileName string) {
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
+	if checkProxy != true && fileName == "proxy_fresh" && forced != true {
+		return errors.New("empty")
+	}
+
+	return nil
 }
 
 func WriteProxyToFile(proxyList []string) {
@@ -67,6 +78,7 @@ func WriteProxyToFile(proxyList []string) {
 
 func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 	defer wg.Done()
+	fmt.Println("Checking, ", data)
 	proxyURL, err := url.Parse("socks5://" + data)
 	if err != nil {
 		return errors.New("error on parse")
@@ -108,19 +120,37 @@ func ProxyTester() {
 
 	var wg sync.WaitGroup
 
-	ReadProxyFromFile("proxy")
+	err := ReadProxyFromFile("proxy_fresh", false)
+	if checkProxy != true && err.Error() != "empty" {
+		fmt.Println("Due to your configuration and your proxy_fresh.txt is not empty. We wont check your proxy.")
+		return
+	}
+
+	_ = ReadProxyFromFile("proxy", true)
 	fmt.Println("Checking proxy, we use 3s timeout for this checker to make sure proxy are fresh and fast.")
+
+	semaphore := make(chan struct{}, 30)
+
 	for _, data := range newProxy {
 		proxyData := data
 
+		semaphore <- struct{}{}
+
 		wg.Add(1)
 		go func() {
+			defer func() {
+				<-semaphore
+			}()
 			CheckRequestProxy(&wg, proxyData)
 		}()
 	}
 
 	wg.Wait()
-	fmt.Println(proxyList)
 	WriteProxyToFile(proxyList)
-	fmt.Println("Proxy checker success, all fresh proxy are on proxy_fresh.txt")
+	fmt.Printf("Proxy checker success, all fresh proxy are on proxy_fresh.txt and you are running this program with %d proxy.\n", len(proxyList))
+	time.Sleep(time.Second * 3)
+
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
