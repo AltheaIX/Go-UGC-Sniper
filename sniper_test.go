@@ -35,16 +35,29 @@ func TestUnmarshalMarketplaceDetail(t *testing.T) {
 
 func TestDeleteIntSlice(t *testing.T) {
 	slice := []int{12312415123, 123121951234, 15283417528, 1231195182}
-	updatedSlice := DeleteIntSlice(slice, 123212415123)
+	updatedSlice := DeleteSlice(slice, 123212415123)
 	t.Log(updatedSlice)
 }
 
 func TestMarketplaceDetailByCollectibleItemId(t *testing.T) {
-	MarketplaceDetailByCollectibleItemId("50987837-dc54-48cf-a1f0-f96ad1a26a32")
+	LoadConfig()
+	detail, err := MarketplaceDetailByCollectibleItemId("7a88889e-70b0-4bc8-afa2-ceacb67d7b84")
+	if err != nil {
+		t.Log(err)
+	}
+	t.Log(detail)
 }
 
 func TestSniper(t *testing.T) {
-	test, err := MarketplaceDetailByCollectibleItemId("")
+	LoadConfig()
+	GetAccountDetails(accountCookie)
+	detail, err := MarketplaceDetailByCollectibleItemId("7a88889e-70b0-4bc8-afa2-ceacb67d7b84")
 	t.Log(err)
-	Sniper(test)
+	for {
+		err = Sniper(detail)
+		if err.Error() == "sold out" {
+			break
+		}
+		t.Log(err)
+	}
 }

@@ -7,7 +7,7 @@ import (
 
 func TestUnmarshalCatalog(t *testing.T) {
 	responseRaw, _, _ := ItemRecentlyAdded()
-	jsonResp := UnmarshalCatalog(responseRaw)
+	jsonResp, _ := UnmarshalCatalog(responseRaw)
 
 	fmt.Println(jsonResp.Detail[0].Id)
 }
@@ -26,6 +26,23 @@ func TestItemRecentlyAdded(t *testing.T) {
 		}
 		fmt.Println(string(responseByte))
 		fmt.Println("")
+	}
+}
+
+func TestDeleteSlice(t *testing.T) {
+	slice1 := []int{1, 2, 3, 4, 5, 6}
+	slice := DeleteSlice(slice1, 3)
+	t.Log(slice)
+}
+
+func TestItemDetailByIdProxied(t *testing.T) {
+	_ = ReadProxyFromFile("proxy_fresh", true)
+	for {
+		responseByte, err := ItemDetailByIdProxied(13532953883)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(responseByte)
 	}
 }
 

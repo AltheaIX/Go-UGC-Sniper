@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -60,7 +61,7 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	}
 
 	scanner, _ := ResponseReader(response)
-	fmt.Println(scanner)
+	fmt.Println(string(scanner))
 
 	marketplaceDetail := UnmarshalMarketplaceDetail(scanner)
 	return marketplaceDetail, err
@@ -104,25 +105,44 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		err = errors.New("status code is not 200")
+
+		err = errors.New(fmt.Sprintf("error code is %d", response.StatusCode))
 		return err
 	}
 
 	scanner, _ := ResponseReader(response)
-	fmt.Println(string(scanner))
-	return err
+	if strings.Contains(string(scanner), "QuantityExhausted") {
+		err = errors.New("sold out")
+		return err
+	}
+	return nil
 }
 
 func SniperHandler() {
+	var itemsToDelete []string
+
 	for _, data := range listFreeItem {
 		fmt.Println("Sniper - Sniping items.")
 		detail, err := MarketplaceDetailByCollectibleItemId(data)
 		if err != nil {
 			fmt.Println(err)
-			time.Sleep(15 * time.Second)
 		}
 
-		err = Sniper(detail)
+		for {
+			go func() {
+				err = Sniper(detail)
+			}()
+
+			if err.Error() == "sold out" {
+				itemsToDelete = append(itemsToDelete, data)
+				break
+			}
+		}
+
 		fmt.Println(err)
+	}
+
+	for _, data := range itemsToDelete {
+		listFreeItem = DeleteSlice(listFreeItem, data)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
-	"golang.org/x/net/proxy"
 	"io"
 	"math/rand"
 	"net/http"
@@ -20,6 +19,8 @@ import (
 	"time"
 	"unsafe"
 )
+
+const VERSION = "Trial"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -44,31 +45,27 @@ func ResponseReader(response *http.Response) ([]byte, error) {
 	return body, err
 }
 
-func DeleteIntSlice(list []int, idToRemove int) []int {
-	var newSlice []int
+func DeleteSlice[T comparable](list []T, elementToRemove T) []T {
+	var newSlice []T
 
-	for i, id := range list {
-		if id == idToRemove {
+	for i, element := range list {
+		if element == elementToRemove {
 			newSlice = append(list[:i], list[i+1:]...)
 			break
 		}
 	}
 
-	if len(newSlice) == 0 {
-		return list
-	}
-
 	return newSlice
 }
 
-func UnmarshalCatalog(responseRaw []byte) *ItemDetail {
+func UnmarshalCatalog(responseRaw []byte) (*ItemDetail, error) {
 	itemDetail := &ItemDetail{}
 
 	err := json.Unmarshal(responseRaw, &itemDetail)
 	if err != nil {
-		fmt.Println(err)
+		return itemDetail, err
 	}
-	return itemDetail
+	return itemDetail, nil
 }
 
 func UnmarshalAccount(responseRaw []byte) *User {
@@ -80,6 +77,48 @@ func UnmarshalAccount(responseRaw []byte) *User {
 	}
 
 	return user
+}
+
+func GetCsrfTokenProxied(proxyURL *url.URL) string {
+	var token string
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: 6 * time.Second,
+	}
+
+	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
+	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
+
+	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
+	if err != nil {
+		// fmt.Printf("Error: %v - GetCsrfToken\n", err)
+		return token
+	}
+
+	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-csrf-token", "xcsrf")
+
+	response, err := client.Do(req)
+	if err != nil {
+		//fmt.Printf("Error: %v - GetCsrfToken\n", err)
+		return token
+	}
+	defer response.Body.Close()
+
+	if response.Header.Get("x-csrf-token") != "" {
+		token = response.Header.Get("x-csrf-token")
+	}
+
+	time.Sleep(0 * time.Second)
+	return token
 }
 
 func GetCsrfToken() string {
@@ -131,7 +170,11 @@ func ItemRecentlyAddedAppend(scanner []byte, proxy *url.URL, err error) (int, *u
 
 	listId = nil
 
-	listItems := UnmarshalCatalog(scanner)
+	listItems, err := UnmarshalCatalog(scanner)
+	if err != nil {
+		return lastItemId, proxy, err
+	}
+
 	for _, data := range listItems.Detail {
 		if data.Id == lastItemId {
 			break
@@ -143,24 +186,22 @@ func ItemRecentlyAddedAppend(scanner []byte, proxy *url.URL, err error) (int, *u
 }
 
 func ItemRecentlyAdded() ([]byte, *url.URL, error) {
-	proxyURL, err := url.Parse(strings.TrimRight("socks5://"+proxyList[rand.Intn(len(proxyList))], "\x00"))
+	proxyURL, err := url.Parse(strings.TrimRight("http://"+proxyList[rand.Intn(len(proxyList)-1)], "\x00"))
 	if err != nil {
 		fmt.Printf("Error: %v - Parser Proxy\n", err)
 		panic(err)
 	}
 
-	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-	if err != nil {
-		fmt.Printf("Error: %v - Dialer Proxy\n", err)
-		panic(err)
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: 6 * time.Second,
 	}
 
-	transport := &http.Transport{
-		Dial:            dialer.Dial,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
-	}
-
-	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
 	req, err := http.NewRequest("GET", "https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories", nil)
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
@@ -184,6 +225,59 @@ func ItemRecentlyAdded() ([]byte, *url.URL, error) {
 	}
 
 	return scanner, proxyURL, nil
+}
+
+func ItemDetailByIdProxied(assetId int) (*ItemDetail, error) {
+	itemDetail := &ItemDetail{}
+	var err error
+
+	proxyURL, err := url.Parse(strings.TrimRight("http://"+proxyList[rand.Intn(len(proxyList)-1)], "\x00"))
+	if err != nil {
+		fmt.Printf("Error: %v - Parser Proxy\n", err)
+		panic(err)
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: 6 * time.Second,
+	}
+
+	jsonPayload := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %d}]}`, assetId)
+	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
+
+	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
+	if err != nil {
+		panic(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("x-csrf-token", GetCsrfTokenProxied(proxyURL))
+
+	response, err := client.Do(req)
+	if err != nil {
+		return itemDetail, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		err = errors.New("status code is not 200")
+		return itemDetail, err
+	}
+
+	scanner, _ := ResponseReader(response)
+	itemDetail, err = UnmarshalCatalog(scanner)
+	if err != nil {
+		return itemDetail, err
+	}
+
+	return itemDetail, nil
 }
 
 func ItemDetailById(assetId int) (*ItemDetail, error) {
@@ -220,19 +314,19 @@ func ItemDetailById(assetId int) (*ItemDetail, error) {
 	}
 	defer response.Body.Close()
 
-	scanner, _ := ResponseReader(response)
-	fmt.Println(string(scanner))
-
 	if response.StatusCode != 200 {
 		err = errors.New("status code is not 200")
-		fmt.Println(string(scanner))
 		fmt.Println("ItemDetail - Rate limit, Item notifier maybe delayed!")
 		return itemDetail, err
 	}
 
-	itemDetail = UnmarshalCatalog(scanner)
+	scanner, _ := ResponseReader(response)
+	itemDetail, err = UnmarshalCatalog(scanner)
+	if err != nil {
+		return itemDetail, err
+	}
 
-	return itemDetail, err
+	return itemDetail, nil
 }
 
 func ItemThumbnailImageById(assetId int) (string, error) {
@@ -288,17 +382,30 @@ func isDebuggerPresent() {
 	}
 	_, _, _ = procCheckRemoteDebuggerPresent.Call(uintptr(unsafe.Pointer(uintptr(handle))), uintptr(unsafe.Pointer(&isDebuggerPresent)))
 	if isDebuggerPresent != 0 {
+		fmt.Println("Debugger detected, closing in 10 seconds.")
+		time.Sleep(10 * time.Second)
 		os.Exit(1)
 	}
 }
 
 func main() {
+	isDebuggerPresent()
+
 	err := setConsoleTitle("UGC Sniper - Beta Version")
 	if err != nil {
 		panic(err)
 	}
 
-	isDebuggerPresent()
+	database, err := ReadFirebase()
+	if err != nil {
+		panic(err)
+	}
+
+	if database.Version.Version != VERSION {
+		fmt.Println("Trial ended, please purchase it on Wagoogus discord.")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
@@ -328,6 +435,12 @@ func main() {
 
 	ProxyTester()
 	_ = ReadProxyFromFile("proxy_fresh", true)
+
+	if len(proxyList) == 0 {
+		fmt.Println("Exiting program, no proxy are fresh.")
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
 	userDetail := GetAccountDetails(accountCookie)
 	fmt.Printf("Logging in as %v and id %d\n\n", userDetail.Username, userDetail.Id)

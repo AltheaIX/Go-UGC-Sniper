@@ -37,7 +37,7 @@ func TestIsFieldSet(t *testing.T) {
         }
     ]
 }`
-	itemDetail := UnmarshalCatalog([]byte(jsonRaw))
+	itemDetail, _ := UnmarshalCatalog([]byte(jsonRaw))
 	fmt.Println(IsFieldSet(itemDetail.Detail[0], "Price"))
 }
 

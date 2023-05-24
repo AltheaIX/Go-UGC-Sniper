@@ -12,7 +12,7 @@ func TestProxyTester(t *testing.T) {
 
 func TestCheckRequestProxy(t *testing.T) {
 	var wg sync.WaitGroup
-	ReadProxyFromFile("proxy", false)
+	ReadProxyFromFile("proxy_socks5", false)
 	for _, data := range newProxy {
 		proxyData := data
 		wg.Add(1)
@@ -30,5 +30,6 @@ func TestReadProxyFromFile(t *testing.T) {
 }
 
 func TestWriteProxyToFile(t *testing.T) {
+	proxyList := []string{"test", "testb"}
 	WriteProxyToFile(proxyList)
 }

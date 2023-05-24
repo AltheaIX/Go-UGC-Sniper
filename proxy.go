@@ -5,13 +5,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"golang.org/x/net/proxy"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -79,24 +77,20 @@ func WriteProxyToFile(proxyList []string) {
 func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 	defer wg.Done()
 	fmt.Println("Checking, ", data)
-	proxyURL, err := url.Parse("socks5://" + data)
+	proxyURL, err := url.Parse(strings.TrimRight("http://"+data, "\x00"))
+
 	if err != nil {
 		return errors.New("error on parse")
 	}
 
-	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-	if err != nil {
-		return errors.New("error on dialer")
-	}
-
-	transport := &http.Transport{
-		Dial:            dialer.Dial,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Skip certificate verification
-	}
-
 	client := &http.Client{
-		Transport: transport,
-		Timeout:   3 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: 6 * time.Second,
 	}
 
 	// Use thumbnail because thumbnail no rate limit
@@ -116,8 +110,6 @@ func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 }
 
 func ProxyTester() {
-	runtime.GOMAXPROCS(5)
-
 	var wg sync.WaitGroup
 
 	err := ReadProxyFromFile("proxy_fresh", false)
@@ -129,7 +121,7 @@ func ProxyTester() {
 	_ = ReadProxyFromFile("proxy", true)
 	fmt.Println("Checking proxy, we use 3s timeout for this checker to make sure proxy are fresh and fast.")
 
-	semaphore := make(chan struct{}, 30)
+	semaphore := make(chan struct{}, threads)
 
 	for _, data := range newProxy {
 		proxyData := data
