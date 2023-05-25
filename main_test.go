@@ -67,3 +67,6 @@ func TestItemThumbnailImageById(t *testing.T) {
 	thumbnailUrl, _ := ItemThumbnailImageById(13177094956)
 	t.Log(thumbnailUrl)
 }
+
+func TestAnything(t *testing.T) {
+}

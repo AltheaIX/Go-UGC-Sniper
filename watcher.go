@@ -19,10 +19,29 @@ var sentWebhookItemId = make(map[int]bool)
 
 var notificationMutex sync.Mutex
 var watcherMutex sync.Mutex
+var pauseFlag bool
 
 var freeWebhookUrl string
 var paidWebhookUrl string
 var threads int
+
+func pauseGoroutines() {
+	watcherMutex.Lock()
+	pauseFlag = true
+	watcherMutex.Unlock()
+}
+
+func resumeGoroutines() {
+	watcherMutex.Lock()
+	pauseFlag = false
+	watcherMutex.Unlock()
+}
+
+func isPaused() bool {
+	watcherMutex.Lock()
+	defer watcherMutex.Unlock()
+	return pauseFlag
+}
 
 func AddToWatcher(sig chan os.Signal) {
 	semaphore := make(chan struct{}, threads)
@@ -38,6 +57,13 @@ func AddToWatcher(sig chan os.Signal) {
 				defer func() {
 					<-semaphore
 				}()
+
+				if isPaused() {
+					watcherMutex.Lock()
+					watcherMutex.Unlock()
+					return
+				}
+
 				lastIdFromArray, proxyURL, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
 
 				if err != nil {
@@ -227,6 +253,12 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 					}
 				}(data)
 
+				if isPaused() {
+					watcherMutex.Lock()
+					watcherMutex.Unlock()
+					return
+				}
+
 				watcherMutex.Lock()
 				if sentWebhookItemId[data] != false {
 					watcherMutex.Unlock()
@@ -278,6 +310,7 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 				listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
 				watcherMutex.Unlock()
 
+				pauseGoroutines()
 				go SniperHandler()
 
 				if sentWebhookItemId[detail.Detail[0].Id] != true {
@@ -368,6 +401,7 @@ func NotifierWatcherHandler(newItemId []int) {
 				break
 			}
 
+			pauseGoroutines()
 			listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
 			go SniperHandler()
 
@@ -376,6 +410,7 @@ func NotifierWatcherHandler(newItemId []int) {
 				fmt.Println(err)
 				continue
 			}
+
 			go NotifierWatcher("free", detail.Detail[0])
 			fmt.Printf("Notifier - Webhook sent to for %d \n", data)
 			break

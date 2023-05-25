@@ -132,6 +132,8 @@ func SniperHandler() {
 	var wg sync.WaitGroup
 
 	for _, data := range listFreeItem {
+		now := time.Now()
+
 		workerSem <- struct{}{}
 		wg.Add(1)
 
@@ -155,9 +157,17 @@ func SniperHandler() {
 					listFreeItem = DeleteSlice(listFreeItem, data)
 					break
 				}
+
+				elapsed := time.Since(now)
+				elapsedMilliseconds := int64(elapsed / time.Millisecond)
+
+				fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
 			}
 		}(data)
 	}
 
 	wg.Wait()
+
+	time.Sleep(1 * time.Second)
+	resumeGoroutines()
 }

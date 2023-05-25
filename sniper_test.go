@@ -51,5 +51,8 @@ func TestMarketplaceDetailByCollectibleItemId(t *testing.T) {
 func TestSniper(t *testing.T) {
 	LoadConfig()
 	GetAccountDetails(accountCookie)
+
+	listFreeItem = append(listFreeItem, "7a88889e-70b0-4bc8-afa2-ceacb67d7b84")
+
 	SniperHandler()
 }
