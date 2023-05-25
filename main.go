@@ -50,9 +50,15 @@ func DeleteSlice[T comparable](list []T, elementToRemove T) []T {
 
 	for i, element := range list {
 		if element == elementToRemove {
-			newSlice = append(list[:i], list[i+1:]...)
+			newSlice = make([]T, len(list)-1)
+			copy(newSlice[:i], list[:i])
+			copy(newSlice[i:], list[i+1:])
 			break
 		}
+	}
+
+	if len(newSlice) <= 0 {
+		newSlice = list
 	}
 
 	return newSlice
@@ -396,6 +402,8 @@ func main() {
 		panic(err)
 	}
 
+	config, err := LoadConfig()
+
 	database, err := ReadFirebase()
 	if err != nil {
 		panic(err)
@@ -409,8 +417,6 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	config, err := LoadConfig()
 
 	var wg sync.WaitGroup
 	defer wg.Done()

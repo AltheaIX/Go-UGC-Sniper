@@ -30,8 +30,12 @@ func TestItemRecentlyAdded(t *testing.T) {
 }
 
 func TestDeleteSlice(t *testing.T) {
-	slice1 := []int{1, 2, 3, 4, 5, 6}
-	slice := DeleteSlice(slice1, 3)
+	slice1 := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	slice := DeleteSlice(slice1, 1)
+	t.Log(slice)
+	slice = DeleteSlice(slice, 2)
+	t.Log(slice)
+	slice = DeleteSlice(slice, 5)
 	t.Log(slice)
 }
 

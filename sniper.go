@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,7 +29,7 @@ func UnmarshalMarketplaceDetail(responseRaw []byte) *MarketplaceDetail {
 }
 
 func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*MarketplaceDetail, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	jsonPayload := fmt.Sprintf(`{"itemIds": ["%v"]}`, collectibleItemId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
@@ -61,26 +62,25 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	}
 
 	scanner, _ := ResponseReader(response)
-	fmt.Println(string(scanner))
 
 	marketplaceDetail := UnmarshalMarketplaceDetail(scanner)
 	return marketplaceDetail, err
 }
 
 func Sniper(detail *MarketplaceDetail) error {
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
 	"expectedCurrency": 1,
-	"expectedPrice": 0,
-	"expectedPurchaserId": %d,
+	"expectedPrice": %d,
+	"expectedPurchaserId": "%d",
 	"expectedPurchaserType": "User",
 	"expectedSellerId": %d,
 	"expectedSellerType": "User",
 	"idempotencyKey": "%v",
 	"collectibleProductId": "%v"
-}`, detail.Data[0].ItemId, accountId, detail.Data[0].CreatorId, uuid.New(), detail.Data[0].ProductId)
+}`, detail.Data[0].ItemId, detail.Data[0].Price, accountId, detail.Data[0].CreatorId, uuid.New(), detail.Data[0].ProductId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
 
 	cookie := &http.Cookie{
@@ -104,8 +104,8 @@ func Sniper(detail *MarketplaceDetail) error {
 		return err
 	}
 	defer response.Body.Close()
-	if response.StatusCode != 200 {
 
+	if response.StatusCode != 200 {
 		err = errors.New(fmt.Sprintf("error code is %d", response.StatusCode))
 		return err
 	}
@@ -115,34 +115,49 @@ func Sniper(detail *MarketplaceDetail) error {
 		err = errors.New("sold out")
 		return err
 	}
+
+	if strings.Contains(string(scanner), "purchase requests exceeds limit") {
+		err = errors.New("limit")
+		return err
+	}
+
+	go BoughtNotifier(detail.Data[0].Name)
+	fmt.Println(string(scanner))
 	return nil
 }
 
 func SniperHandler() {
-	var itemsToDelete []string
+	workerCount := 3 // Set the number of concurrent workers
+	workerSem := make(chan struct{}, workerCount)
+	var wg sync.WaitGroup
 
 	for _, data := range listFreeItem {
-		fmt.Println("Sniper - Sniping items.")
-		detail, err := MarketplaceDetailByCollectibleItemId(data)
-		if err != nil {
-			fmt.Println(err)
-		}
+		workerSem <- struct{}{}
+		wg.Add(1)
 
-		for {
-			go func() {
-				err = Sniper(detail)
+		go func(data string) {
+			defer func() {
+				<-workerSem
+				wg.Done()
 			}()
 
-			if err.Error() == "sold out" {
-				itemsToDelete = append(itemsToDelete, data)
-				break
+			detail, err := MarketplaceDetailByCollectibleItemId(data)
+			if err != nil {
+				fmt.Println(err)
+				return
 			}
-		}
 
-		fmt.Println(err)
+			fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
+			for {
+				err = Sniper(detail)
+				if err != nil && err.Error() == "sold out" {
+					fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
+					listFreeItem = DeleteSlice(listFreeItem, data)
+					break
+				}
+			}
+		}(data)
 	}
 
-	for _, data := range itemsToDelete {
-		listFreeItem = DeleteSlice(listFreeItem, data)
-	}
+	wg.Wait()
 }

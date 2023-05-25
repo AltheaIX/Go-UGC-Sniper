@@ -18,6 +18,7 @@ var newItemId []int
 var sentWebhookItemId = make(map[int]bool)
 
 var notificationMutex sync.Mutex
+var watcherMutex sync.Mutex
 
 var freeWebhookUrl string
 var paidWebhookUrl string
@@ -26,7 +27,6 @@ var threads int
 func AddToWatcher(sig chan os.Signal) {
 	semaphore := make(chan struct{}, threads)
 	go OffsaleTrackerHandler()
-	go SniperHandler()
 	for {
 		select {
 		case <-sig:
@@ -88,6 +88,12 @@ func AddToWatcher(sig chan os.Signal) {
 }
 
 func NotifierWatcher(notifierType string, data Data) error {
+	if sentWebhookItemId[data.Id] != false {
+		return errors.New("webhook tried to send more than once")
+	}
+
+	sentWebhookItemId[data.Id] = true
+
 	switch notifierType {
 	case "free":
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -221,9 +227,12 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 					}
 				}(data)
 
+				watcherMutex.Lock()
 				if sentWebhookItemId[data] != false {
+					watcherMutex.Unlock()
 					break
 				}
+				watcherMutex.Unlock()
 
 				detail, err := ItemDetailByIdProxied(data)
 				if err != nil {
@@ -235,32 +244,52 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 					break
 				}
 
-				watcherId = DeleteSlice(watcherId, data)
-
 				if detail.Detail[0].UnitsAvailable == 0 || detail.Detail[0].Quantity == 0 {
 					fmt.Printf("Watcher - %d will be removed from watcher list.\n", data)
+					watcherMutex.Lock()
+					watcherId = DeleteSlice(watcherId, data)
+					watcherMutex.Unlock()
 					break
 				}
 
-				detail.Detail[0].Image, err = ItemThumbnailImageById(data)
 				_name := strings.Replace(string(detail.Detail[0].Name), `"`, "", 2)
 				detail.Detail[0].Name = jsoniter.RawMessage(_name)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
+
+				watcherMutex.Lock()
+				watcherId = DeleteSlice(watcherId, data)
 
 				if detail.Detail[0].Price != 0 {
-					go NotifierWatcher("paid", detail.Detail[0])
-					fmt.Printf("Notifier - Webhook sent to for %d \n", data)
-					sentWebhookItemId[detail.Detail[0].Id] = true
+					watcherMutex.Unlock()
+
+					if sentWebhookItemId[detail.Detail[0].Id] != true {
+						detail.Detail[0].Image, err = ItemThumbnailImageById(data)
+						if err != nil {
+							fmt.Println(err)
+							continue
+						}
+
+						go NotifierWatcher("paid", detail.Detail[0])
+						fmt.Printf("Notifier - Webhook sent to for %d \n", data)
+					}
+
 					break
 				}
 
 				listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
-				go NotifierWatcher("free", detail.Detail[0])
-				fmt.Printf("Notifier - Webhook sent to for %d \n", data)
-				sentWebhookItemId[detail.Detail[0].Id] = true
+				watcherMutex.Unlock()
+
+				go SniperHandler()
+
+				if sentWebhookItemId[detail.Detail[0].Id] != true {
+					detail.Detail[0].Image, err = ItemThumbnailImageById(data)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					go NotifierWatcher("free", detail.Detail[0])
+					fmt.Printf("Notifier - Webhook sent to for %d \n", data)
+				}
+
 				break
 			}
 		}(data)
@@ -324,26 +353,61 @@ func NotifierWatcherHandler(newItemId []int) {
 				break
 			}
 
-			detail.Detail[0].Image, err = ItemThumbnailImageById(data)
 			_name := strings.Replace(string(detail.Detail[0].Name), `"`, "", 2)
 			detail.Detail[0].Name = jsoniter.RawMessage(_name)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
 
 			if detail.Detail[0].Price != 0 {
+				detail.Detail[0].Image, err = ItemThumbnailImageById(data)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
 				go NotifierWatcher("paid", detail.Detail[0])
 				fmt.Printf("Notifier - Webhook sent to for %d \n", data)
-				sentWebhookItemId[detail.Detail[0].Id] = true
 				break
 			}
 
 			listFreeItem = append(listFreeItem, detail.Detail[0].CollectibleItemId)
+			go SniperHandler()
+
+			detail.Detail[0].Image, err = ItemThumbnailImageById(data)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 			go NotifierWatcher("free", detail.Detail[0])
 			fmt.Printf("Notifier - Webhook sent to for %d \n", data)
-			sentWebhookItemId[detail.Detail[0].Id] = true
 			break
 		}
+	}
+}
+
+func BoughtNotifier(name string) {
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	webhookBuilder := fmt.Sprintf(`{
+	  "content": "Bought **%v** on **%v**",
+	  "embeds": null,
+	  "attachments": []
+	}`, name, username)
+	dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
+
+	req, err := http.NewRequest("POST", "https://discord.com/api/webhooks/1110976926283214958/JJg0SEhpMT2xpt_g4LSfjPgiAqhYx2iiA88MlZ8t7aQuSnxELnaulhjDxvEJoV1w0o95", dataRequest)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		fmt.Println("Bought notifier error")
+		return
 	}
 }

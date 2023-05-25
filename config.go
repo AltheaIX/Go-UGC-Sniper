@@ -9,8 +9,11 @@ import (
 	"time"
 )
 
+var username string
+
 func SetAccountDetails(user User) {
 	accountId = user.Id
+	username = user.Username
 }
 
 func GetAccountDetails(accountCookie string) *User {
@@ -74,7 +77,6 @@ func LoadConfig() (Config, error) {
 	lastItemId = config.LastId
 	watcherId = config.OffsaleId
 	return config, err
-
 }
 
 func SaveConfig(filename string, config Config) error {
