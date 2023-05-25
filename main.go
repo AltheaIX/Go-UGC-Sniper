@@ -409,8 +409,14 @@ func main() {
 		panic(err)
 	}
 
-	if database.Version.Version != VERSION {
+	if database.Trial.Status != "active" {
 		fmt.Println("Trial ended, please purchase it on Wagoogus discord.")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+
+	if database.Version.Version != VERSION {
+		fmt.Println("New version updated, please to download it on Wagoogus discord.")
 		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
