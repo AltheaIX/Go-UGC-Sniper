@@ -20,7 +20,7 @@ import (
 	"unsafe"
 )
 
-const VERSION = "Trial"
+const VERSION = "v1.1.0"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -233,7 +233,7 @@ func ItemRecentlyAdded() ([]byte, *url.URL, error) {
 	return scanner, proxyURL, nil
 }
 
-func ItemDetailByIdProxied(assetId int) (*ItemDetail, error) {
+func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	itemDetail := &ItemDetail{}
 	var err error
 
@@ -253,8 +253,15 @@ func ItemDetailByIdProxied(assetId int) (*ItemDetail, error) {
 		Timeout: 6 * time.Second,
 	}
 
-	jsonPayload := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %d}]}`, assetId)
-	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
+	var items []OffsaleItems
+
+	for _, data := range assetId {
+		items = append(items, OffsaleItems{ItemType: 1, ID: data})
+	}
+
+	payload := &OffsalePayload{Items: items}
+	jsonPayload, _ := json.Marshal(payload)
+	dataRequest := bytes.NewBuffer(jsonPayload)
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {

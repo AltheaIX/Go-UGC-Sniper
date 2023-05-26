@@ -24,3 +24,12 @@ type User struct {
 type ItemDetail struct {
 	Detail []Data `json:"data"`
 }
+
+type OffsaleItems struct {
+	ItemType int `json:"itemType"`
+	ID       int `json:"id"`
+}
+
+type OffsalePayload struct {
+	Items []OffsaleItems `json:"items"`
+}

@@ -4,11 +4,41 @@ import (
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"strings"
+	"sync"
 	"testing"
 )
 
 func TestAddToWatcher(t *testing.T) {
 	// AddToWatcher()
+}
+
+func TestReleaseSemaphore(t *testing.T) {
+	semaphore := make(chan struct{}, 3)
+	var wg sync.WaitGroup
+
+	for {
+		select {
+		case <-pauseChan:
+			fmt.Println("Paused")
+			resumeGoroutines()
+			continue
+		default:
+			go func() {
+				defer func() {
+					wg.Done()
+					ReleaseSemaphore(semaphore)
+				}()
+
+				semaphore <- struct{}{}
+				wg.Add(1)
+				fmt.Println("Worker started")
+
+				pauseGoroutines()
+			}()
+		}
+	}
+
+	wg.Wait()
 }
 
 func TestIsFieldSet(t *testing.T) {

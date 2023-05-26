@@ -121,6 +121,10 @@ func Sniper(detail *MarketplaceDetail) error {
 		return err
 	}
 
+	if strings.Contains(string(scanner), `"purchased":false`) {
+		return err
+	}
+
 	go BoughtNotifier(detail.Data[0].Name)
 	fmt.Println(string(scanner))
 	return nil
@@ -151,6 +155,13 @@ func SniperHandler() {
 
 			fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
 			for {
+				defer func() {
+					elapsed := time.Since(now)
+					elapsedMilliseconds := int64(elapsed / time.Millisecond)
+
+					fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
+				}()
+
 				err = Sniper(detail)
 				if err != nil && err.Error() == "sold out" {
 					fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
@@ -158,10 +169,10 @@ func SniperHandler() {
 					break
 				}
 
-				elapsed := time.Since(now)
-				elapsedMilliseconds := int64(elapsed / time.Millisecond)
-
-				fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
+				if err != nil {
+					listFreeItem = DeleteSlice(listFreeItem, data)
+					break
+				}
 			}
 		}(data)
 	}
