@@ -72,7 +72,7 @@ func TestIsFieldSet(t *testing.T) {
 }
 
 func TestNotifierWatcher(t *testing.T) {
-	data, _ := ItemDetailById(13186590783)
+	data, _ := ItemDetailById([]int{13186590783})
 	data.Detail[0].Image, _ = ItemThumbnailImageById(13186590783)
 	_name := strings.Replace(string(data.Detail[0].Name), `"`, "", 2)
 	t.Log(_name)
@@ -85,6 +85,6 @@ func TestNotifierWatcher(t *testing.T) {
 }
 
 func TestNotifierWatcherHandler(t *testing.T) {
-	newItemId := []int{13502640961, 13502643452}
+	newItemId := []int{13502640961, 13502643452, 13557096529}
 	NotifierWatcherHandler(newItemId)
 }

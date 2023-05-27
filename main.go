@@ -20,7 +20,7 @@ import (
 	"unsafe"
 )
 
-const VERSION = "v1.1.0"
+const VERSION = "v1.2.0"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -31,16 +31,17 @@ func ResponseReader(response *http.Response) ([]byte, error) {
 	var body []byte
 	var err error
 
-	reader := bufio.NewReaderSize(response.Body, 4096*2)
+	reader := bufio.NewReader(response.Body)
 	for {
-		chunk, err := reader.ReadSlice('\n')
-		if err != nil && err != io.EOF {
-			break
+		chunk, err := reader.ReadBytes('\n')
+		if err != nil {
+			if err == io.EOF {
+				body = append(body, chunk...)
+				break
+			}
+			return nil, err
 		}
 		body = append(body, chunk...)
-		if err == io.EOF {
-			break
-		}
 	}
 	return body, err
 }
@@ -62,6 +63,20 @@ func DeleteSlice[T comparable](list []T, elementToRemove T) []T {
 	}
 
 	return newSlice
+}
+
+func IsExist[T comparable](list []T, elementToCheck T) bool {
+	encountered := make(map[T]bool)
+
+	for _, element := range list {
+		encountered[element] = true
+	}
+
+	if encountered[elementToCheck] {
+		return true
+	}
+
+	return false
 }
 
 func UnmarshalCatalog(responseRaw []byte) (*ItemDetail, error) {
@@ -293,7 +308,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	return itemDetail, nil
 }
 
-func ItemDetailById(assetId int) (*ItemDetail, error) {
+func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	itemDetail := &ItemDetail{}
 	var err error
 
@@ -307,8 +322,15 @@ func ItemDetailById(assetId int) (*ItemDetail, error) {
 		Expires: time.Now().Add(time.Hour * 1000),
 	}
 
-	jsonPayload := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %d}]}`, assetId)
-	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
+	var items []OffsaleItems
+
+	for _, data := range assetId {
+		items = append(items, OffsaleItems{ItemType: 1, ID: data})
+	}
+
+	payload := &OffsalePayload{Items: items}
+	jsonPayload, _ := json.Marshal(payload)
+	dataRequest := bytes.NewBuffer(jsonPayload)
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
@@ -334,8 +356,10 @@ func ItemDetailById(assetId int) (*ItemDetail, error) {
 	}
 
 	scanner, _ := ResponseReader(response)
+
 	itemDetail, err = UnmarshalCatalog(scanner)
 	if err != nil {
+		fmt.Println(string(scanner))
 		return itemDetail, err
 	}
 
@@ -464,6 +488,12 @@ func main() {
 	userDetail := GetAccountDetails(accountCookie)
 	fmt.Printf("Logging in as %v and id %d\n\n", userDetail.Username, userDetail.Id)
 	time.Sleep(time.Second * 5)
+
+	err = AllItems()
+	if err != nil {
+		panic(err)
+		time.Sleep(5 * time.Second)
+	}
 
 	AddToWatcher(sig)
 
