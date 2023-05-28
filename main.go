@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -20,7 +21,7 @@ import (
 	"unsafe"
 )
 
-const VERSION = "v1.2.0"
+const VERSION = "v1.2.2"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -48,21 +49,21 @@ func ResponseReader(response *http.Response) ([]byte, error) {
 
 func DeleteSlice[T comparable](list []T, elementToRemove T) []T {
 	var newSlice []T
+	elementFound := false
 
-	for i, element := range list {
+	for _, element := range list {
 		if element == elementToRemove {
-			newSlice = make([]T, len(list)-1)
-			copy(newSlice[:i], list[:i])
-			copy(newSlice[i:], list[i+1:])
-			break
+			elementFound = true
 		}
+
+		newSlice = append(newSlice, element)
 	}
 
-	if len(newSlice) <= 0 {
-		newSlice = list
+	if elementFound {
+		return newSlice
 	}
 
-	return newSlice
+	return list
 }
 
 func IsExist[T comparable](list []T, elementToCheck T) bool {
@@ -94,7 +95,7 @@ func UnmarshalAccount(responseRaw []byte) *User {
 
 	err := json.Unmarshal(responseRaw, &user)
 	if err != nil {
-		fmt.Println(err)
+		return user
 	}
 
 	return user
@@ -428,7 +429,16 @@ func isDebuggerPresent() {
 func main() {
 	isDebuggerPresent()
 
-	err := setConsoleTitle("UGC Sniper - Beta Version")
+	executePath, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+
+	if strings.Contains(executePath, "Go-UGC-Sniper-update.exe") {
+		os.Remove(filepath.Join(filepath.Dir(executePath), "Go-UGC-Sniper.exe"))
+	}
+
+	err = setConsoleTitle("UGC Sniper - Beta Version")
 	if err != nil {
 		panic(err)
 	}
@@ -447,7 +457,37 @@ func main() {
 	}
 
 	if database.Version.Version != VERSION {
-		fmt.Println("New version updated, please to download it on Wagoogus discord.")
+		fmt.Println("New update found, auto update on process...")
+
+		var updateFilePath string
+		updateDir := filepath.Dir(executePath)
+		updateFilePath = filepath.Join(updateDir, "Go-UGC-Sniper.exe")
+
+		if !strings.Contains(executePath, "Go-UGC-Sniper-update.exe") {
+			updateFilePath = filepath.Join(updateDir, "Go-UGC-Sniper-update.exe")
+		}
+
+		err = DownloadFile(updateFilePath)
+		if err != nil {
+			fmt.Println("Failed to auto update, but you can still update it from Wagoogus Discord.")
+			time.Sleep(5 * time.Second)
+			os.Exit(1)
+		}
+
+		// Start the command to delete the current executable in the background
+		err = os.Remove(executePath)
+		if err != nil {
+			fmt.Println("Failed to replace program, but it is still saved.")
+			return
+		}
+
+		err = os.Rename(updateFilePath, executePath)
+		if err != nil {
+			fmt.Println("Failed to replace executable, ", err)
+			return
+		}
+
+		fmt.Println("Update success, program will closed and you can just reopen it.")
 		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
@@ -486,6 +526,13 @@ func main() {
 	}
 
 	userDetail := GetAccountDetails(accountCookie)
+
+	if userDetail.Id == 0 {
+		fmt.Println("Invalid Cookie, program exiting within 5 seconds.")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+
 	fmt.Printf("Logging in as %v and id %d\n\n", userDetail.Username, userDetail.Id)
 	time.Sleep(time.Second * 5)
 

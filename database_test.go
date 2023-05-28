@@ -3,5 +3,6 @@ package main
 import "testing"
 
 func TestReadFirebase(t *testing.T) {
-	ReadFirebase()
+	db, _ := ReadFirebase()
+	t.Log(db.Version.Newlink)
 }

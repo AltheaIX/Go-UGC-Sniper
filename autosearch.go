@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 )
 
@@ -50,6 +51,7 @@ func AllItems() error {
 
 	var response *http.Response
 	var err error
+	var itemDetail *ItemDetail
 
 	for {
 		response, err = MakeRequest("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories")
@@ -57,12 +59,13 @@ func AllItems() error {
 			fmt.Println(err)
 			continue
 		}
-		break
-	}
 
-	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		return errors.New("status code is not 200")
+		defer response.Body.Close()
+		if response.StatusCode != 200 {
+			continue
+		}
+
+		break
 	}
 
 	scanner, _ := ResponseReader(response)
@@ -77,9 +80,12 @@ func AllItems() error {
 		allItems = append(allItems, data.ID)
 	}
 
-	itemDetail, err := ItemDetailById(allItems)
-	if err != nil {
-		fmt.Println(err)
+	for {
+		itemDetail, err = ItemDetailById(allItems)
+		if err != nil {
+			continue
+		}
+		break
 	}
 
 	for _, data := range itemDetail.Detail {
@@ -111,12 +117,13 @@ func AllItems() error {
 					fmt.Println(err)
 					continue
 				}
-				break
-			}
 
-			defer response.Body.Close()
-			if response.StatusCode != 200 {
-				return errors.New("status code is not 200")
+				defer response.Body.Close()
+				if response.StatusCode != 200 {
+					continue
+				}
+
+				break
 			}
 
 			scanner, _ := ResponseReader(response)
@@ -131,9 +138,12 @@ func AllItems() error {
 				allItems = append(allItems, data.ID)
 			}
 
-			itemDetail, err := ItemDetailById(allItems)
-			if err != nil {
-				fmt.Println(err)
+			for {
+				itemDetail, err = ItemDetailById(allItems)
+				if err != nil {
+					continue
+				}
+				break
 			}
 
 			for _, data := range itemDetail.Detail {
@@ -142,6 +152,7 @@ func AllItems() error {
 						continue
 					}
 
+					sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
 					if len(watcherId) == 120 {
 						watcherId = watcherId[:118]
 					}

@@ -11,4 +11,5 @@ type Trial struct {
 
 type Version struct {
 	Version string
+	Newlink string
 }

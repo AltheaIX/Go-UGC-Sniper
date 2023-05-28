@@ -35,14 +35,17 @@ func GetAccountDetails(accountCookie string) *User {
 
 	response, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return nil
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		err = errors.New("status code is not 200")
 	}
 
-	scanner, _ := ResponseReader(response)
+	scanner, err := ResponseReader(response)
+	if err != nil {
+		return nil
+	}
 
 	userPtr := UnmarshalAccount(scanner)
 	user := *userPtr

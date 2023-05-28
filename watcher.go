@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -251,94 +252,72 @@ func NotifierWatcher(notifierType string, data Data) error {
 func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}) {
 	defer wg.Done()
 
-	for i := 0; i < len(offsaleId); i++ {
-		select {
-		case <-pauseChan:
-			watcherMutex.Lock()
-			isPaused := pauseFlag
-			watcherMutex.Unlock()
-			if isPaused {
-				ReleaseSemaphore(semaphore)
-				<-pauseChan // Wait for resume signal before continuing
-				continue
-			}
-		default:
-			semaphore <- struct{}{}
+	select {
+	case <-pauseChan:
+		watcherMutex.Lock()
+		isPaused := pauseFlag
+		watcherMutex.Unlock()
+		if isPaused {
+			ReleaseSemaphore(semaphore)
+			<-pauseChan // Wait for resume signal before continuing
+			return
+		}
+	default:
+		semaphore <- struct{}{}
 
-			go func(data []int) {
-				defer func() {
-					<-semaphore
-				}()
+		go func(data []int) {
+			defer func() {
+				<-semaphore
+			}()
 
-				defer func() {
-					if err := recover(); err != nil {
-						fmt.Printf("Recovered from panic: %v\n", err)
-					}
-				}()
-
-				watcherMutex.Lock()
-				if pauseFlag {
-					return
+			defer func() {
+				if err := recover(); err != nil {
+					fmt.Printf("Recovered from panic: %v\n", err)
 				}
-				watcherMutex.Unlock()
+			}()
 
-				for {
-					details, err := ItemDetailByIdProxied(offsaleId)
-					if err != nil {
+			watcherMutex.Lock()
+			if pauseFlag {
+				return
+			}
+			watcherMutex.Unlock()
+
+			for {
+				details, err := ItemDetailByIdProxied(offsaleId)
+				if err != nil {
+					continue
+				}
+
+				for _, data := range details.Detail {
+					watcherMutex.Lock()
+
+					if sentWebhookItemId[data.Id] != false {
+						watcherMutex.Unlock()
 						continue
 					}
 
-					for _, data := range details.Detail {
-						watcherMutex.Lock()
+					watcherMutex.Unlock()
 
-						if sentWebhookItemId[data.Id] != false {
-							watcherMutex.Unlock()
-							continue
-						}
+					if data.PriceStatus == "Off Sale" && data.Quantity == 0 {
+						continue
+					}
 
-						watcherMutex.Unlock()
-
-						if data.PriceStatus == "Off Sale" && data.Quantity == 0 {
-							fmt.Printf("Watcher - %d still on offsale.\n", data.Id)
-							continue
-						}
-
-						if data.UnitsAvailable == 0 || data.Quantity == 0 {
-							fmt.Printf("Watcher - %d will be removed from watcher list.\n", data.Id)
-							watcherMutex.Lock()
-							watcherId = DeleteSlice(watcherId, data.Id)
-							watcherMutex.Unlock()
-							continue
-						}
-
-						_name := strings.Replace(string(data.Name), `"`, "", 2)
-						data.Name = jsoniter.RawMessage(_name)
-
+					if data.UnitsAvailable == 0 || data.Quantity == 0 {
+						fmt.Printf("Watcher - %d will be removed from watcher list.\n", data.Id)
 						watcherMutex.Lock()
 						watcherId = DeleteSlice(watcherId, data.Id)
-
-						if data.Price != 0 {
-							watcherMutex.Unlock()
-
-							if sentWebhookItemId[data.Id] != true {
-								data.Image, err = ItemThumbnailImageById(data.Id)
-								if err != nil {
-									fmt.Println(err)
-									continue
-								}
-
-								go NotifierWatcher("paid", data)
-								fmt.Printf("Notifier - Webhook sent to for %d \n", data.Id)
-							}
-
-							continue
-						}
-
-						listFreeItem = append(listFreeItem, data.CollectibleItemId)
 						watcherMutex.Unlock()
+						continue
+					}
 
-						pauseGoroutines()
-						go SniperHandler()
+					_name := strings.Replace(string(data.Name), `"`, "", 2)
+					data.Name = jsoniter.RawMessage(_name)
+
+					watcherMutex.Lock()
+					watcherId = DeleteSlice(watcherId, data.Id)
+
+					if data.Price != 0 {
+						watcherMutex.Unlock()
 
 						if sentWebhookItemId[data.Id] != true {
 							data.Image, err = ItemThumbnailImageById(data.Id)
@@ -346,15 +325,34 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 								fmt.Println(err)
 								continue
 							}
-							go NotifierWatcher("free", data)
+
+							go NotifierWatcher("paid", data)
 							fmt.Printf("Notifier - Webhook sent to for %d \n", data.Id)
 						}
 
 						continue
 					}
+
+					listFreeItem = append(listFreeItem, data.CollectibleItemId)
+					watcherMutex.Unlock()
+
+					pauseGoroutines()
+					go SniperHandler()
+
+					if sentWebhookItemId[data.Id] != true {
+						data.Image, err = ItemThumbnailImageById(data.Id)
+						if err != nil {
+							fmt.Println(err)
+							continue
+						}
+						go NotifierWatcher("free", data)
+						fmt.Printf("Notifier - Webhook sent to for %d \n", data.Id)
+					}
+
+					continue
 				}
-			}(offsaleId)
-		}
+			}
+		}(offsaleId)
 	}
 }
 
@@ -411,6 +409,8 @@ func NotifierWatcherHandler(newItemId []int) {
 				if IsExist(watcherId, data.Id) {
 					continue
 				}
+
+				sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
 
 				if len(watcherId) == 120 {
 					watcherId = watcherId[:118]

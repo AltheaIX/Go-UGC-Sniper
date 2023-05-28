@@ -22,7 +22,7 @@ var checkProxy bool
 func ReadProxyFromFile(fileName string, forced bool) error {
 	file, err := os.Open(fileName + ".txt") // Replace with the path to your file
 	if err != nil {
-		panic(err)
+		file, _ = os.Create(fileName + ".txt")
 	}
 	defer file.Close()
 

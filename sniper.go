@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -68,7 +67,13 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 }
 
 func Sniper(detail *MarketplaceDetail) error {
-	client := &http.Client{Timeout: 15 * time.Second}
+	transport := &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 7,
+		DisableKeepAlives:   false,
+		MaxConnsPerHost:     5,
+	}
+	client := &http.Client{Transport: transport, Timeout: 15 * time.Second}
 
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
@@ -96,7 +101,6 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("x-csrf-token", GetCsrfToken())
 	req.AddCookie(cookie)
 
@@ -128,57 +132,42 @@ func Sniper(detail *MarketplaceDetail) error {
 
 	go BoughtNotifier(detail.Data[0].Name)
 	fmt.Println(string(scanner))
+	time.Sleep(1 * time.Second)
 	return nil
 }
 
 func SniperHandler() {
-	workerCount := 3 // Set the number of concurrent workers
-	workerSem := make(chan struct{}, workerCount)
-	var wg sync.WaitGroup
-
 	for _, data := range listFreeItem {
 		now := time.Now()
 
-		workerSem <- struct{}{}
-		wg.Add(1)
+		detail, err := MarketplaceDetailByCollectibleItemId(data)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-		go func(data string) {
+		fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
+		for {
 			defer func() {
-				<-workerSem
-				wg.Done()
+				elapsed := time.Since(now)
+				elapsedMilliseconds := int64(elapsed / time.Millisecond)
+
+				fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
 			}()
 
-			detail, err := MarketplaceDetailByCollectibleItemId(data)
+			err = Sniper(detail)
+			if err != nil && err.Error() == "sold out" {
+				fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
+				listFreeItem = DeleteSlice(listFreeItem, data)
+				break
+			}
+
 			if err != nil {
-				fmt.Println(err)
-				return
+				listFreeItem = DeleteSlice(listFreeItem, data)
+				break
 			}
-
-			fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
-			for {
-				defer func() {
-					elapsed := time.Since(now)
-					elapsedMilliseconds := int64(elapsed / time.Millisecond)
-
-					fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
-				}()
-
-				err = Sniper(detail)
-				if err != nil && err.Error() == "sold out" {
-					fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
-					listFreeItem = DeleteSlice(listFreeItem, data)
-					break
-				}
-
-				if err != nil {
-					listFreeItem = DeleteSlice(listFreeItem, data)
-					break
-				}
-			}
-		}(data)
+		}
 	}
-
-	wg.Wait()
 
 	time.Sleep(1 * time.Second)
 	resumeGoroutines()
