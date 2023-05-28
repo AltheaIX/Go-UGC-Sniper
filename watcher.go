@@ -249,8 +249,11 @@ func NotifierWatcher(notifierType string, data Data) error {
 	return nil
 }
 
-func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}) {
+func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 	defer wg.Done()
+	watcherMutex.Lock()
+	offsaleId := watcherId[:]
+	watcherMutex.Unlock()
 
 	select {
 	case <-pauseChan:
@@ -278,6 +281,7 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 
 			watcherMutex.Lock()
 			if pauseFlag {
+				watcherMutex.Unlock()
 				return
 			}
 			watcherMutex.Unlock()
@@ -351,6 +355,7 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 
 					continue
 				}
+				break
 			}
 		}(offsaleId)
 	}
@@ -358,13 +363,13 @@ func OffsaleTracker(offsaleId []int, wg *sync.WaitGroup, semaphore chan struct{}
 
 func OffsaleTrackerHandler() {
 	fmt.Println("System - Offsale Tracker activated.")
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, 10)
 
 	for {
 		wg.Add(1)
 
-		go OffsaleTracker(watcherId, &wg, semaphore)
+		go OffsaleTracker(&wg, semaphore)
 
 		wg.Wait()
 	}

@@ -54,6 +54,7 @@ func DeleteSlice[T comparable](list []T, elementToRemove T) []T {
 	for _, element := range list {
 		if element == elementToRemove {
 			elementFound = true
+			continue
 		}
 
 		newSlice = append(newSlice, element)
@@ -281,7 +282,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
-		panic(err)
+		return itemDetail, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")

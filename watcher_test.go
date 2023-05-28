@@ -41,6 +41,16 @@ func TestReleaseSemaphore(t *testing.T) {
 	wg.Wait()
 }
 
+func TestOffsaleTracker(t *testing.T) {
+	_ = ReadProxyFromFile("proxy_fresh", true)
+	watcherId = []int{13562538536, 13570957619, 13569927870, 13571520410, 13570759527, 13570660992}
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go OffsaleTrackerHandler()
+	wg.Wait()
+}
+
 func TestIsFieldSet(t *testing.T) {
 	jsonRaw := `{
     "data": [
