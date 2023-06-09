@@ -98,3 +98,9 @@ func TestNotifierWatcherHandler(t *testing.T) {
 	newItemId := []int{13502640961, 13502643452, 13557096529}
 	NotifierWatcherHandler(newItemId)
 }
+
+func TestBoughtNotifier(t *testing.T) {
+	LoadConfig()
+	GetAccountDetails(accountCookie)
+	BoughtNotifier("test")
+}

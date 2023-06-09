@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"testing"
-	"time"
 )
 
 func TestUnmarshalCatalog(t *testing.T) {
@@ -79,36 +77,22 @@ func TestItemThumbnailImageById(t *testing.T) {
 }
 
 func TestAnything(t *testing.T) {
-	fmt.Println("System - Offsale Tracker activated.")
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10)
-	watcherId = []int{123124123, 1231234912, 12391285934, 12312482351}
+	/*watcherId = []int{1111, 2222, 3333, 4444, 5555}
+	sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
+	fmt.Println(watcherId)
+	watcherId = append(watcherId, 6666)
+	fmt.Println(watcherId[:])
+	sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
+	fmt.Println(watcherId[:])*/
+
+	test := true
 
 	for {
-		wg.Add(1)
-
 		go func() {
-			time.Sleep(5 * time.Second)
-			watcherId = DeleteSlice(watcherId, 123124123)
-			fmt.Println(len(watcherId))
+			externalScannerMutex.Lock()
+			t.Log(test)
+			test = false
+			externalScannerMutex.Unlock()
 		}()
-
-		go func(wg *sync.WaitGroup, semaphore chan struct{}) {
-			defer func() {
-				<-semaphore
-				wg.Done()
-			}()
-			semaphore <- struct{}{}
-
-			watcherMutex.Lock()
-			offsaleId := watcherId[:]
-			watcherMutex.Unlock()
-
-			for {
-				fmt.Println(offsaleId)
-			}
-		}(&wg, semaphore)
-
-		wg.Wait()
 	}
 }

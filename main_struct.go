@@ -8,6 +8,7 @@ type Data struct {
 	Name              jsoniter.RawMessage `json:"name,omitempty"`
 	Price             int                 `json:"price,omitempty"`
 	Quantity          int                 `json:"totalQuantity,omitempty"`
+	SaleLocationType  string              `json:"saleLocationType,omitempty"`
 	Image             string              `json:"imageUrl,omitempty"`
 	UnitsAvailable    int                 `json:"unitsAvailableForConsumption,omitempty"`
 	PriceStatus       string              `json:"priceStatus,omitempty"`

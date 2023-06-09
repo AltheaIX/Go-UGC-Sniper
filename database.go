@@ -4,22 +4,30 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 func UnmarshalDatabase(responseRaw []byte) *Database {
-	trial := &Database{}
+	database := &Database{}
 
-	err := json.Unmarshal(responseRaw, &trial)
+	err := json.Unmarshal(responseRaw, &database)
 	if err != nil {
 		fmt.Println(err)
 	}
-	return trial
+	return database
 }
 
 func ReadFirebase() (*Database, error) {
 	dataBase := &Database{}
 	// Set up the Firebase Realtime Database URL
-	databaseURL := "https://ugc-authentication-default-rtdb.asia-southeast1.firebasedatabase.app/"
+	encryptedText := "8ZayCxzy4sXzrPsv3tov6UXY4XO0jTXCcBVJdQjS/L6MC/BqDJz9zUdZNxWI5oMUu3dbKMo2zEHEo6eYwCStv8A0es8KwKuMaGDo1nfB5WWesLboaaMQwGbjZPEard4o"
+	databaseURL, err := Decrypt(encryptedText, xKey)
+	if err != nil {
+		fmt.Println("error on encryption.")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
 
 	requestURL := databaseURL + ".json"
 
@@ -42,5 +50,6 @@ func ReadFirebase() (*Database, error) {
 	}
 
 	dataBase = UnmarshalDatabase(scanner)
+
 	return dataBase, nil
 }

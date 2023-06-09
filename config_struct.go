@@ -5,7 +5,6 @@ type Config struct {
 	PaidWebhook string
 	Cookie      string
 	LastId      int
-	OffsaleId   []int
 	Options     ConfigOptions
 }
 

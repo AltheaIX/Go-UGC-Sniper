@@ -107,7 +107,7 @@ func AllItems() error {
 		}
 	}
 
-	for i := 0; i <= 5; i++ {
+	for i := 0; i <= 10; i++ {
 		allItems = []int{}
 
 		if listItem.NextPageCursor != "" {
@@ -155,6 +155,7 @@ func AllItems() error {
 					sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
 					if len(watcherId) == 120 {
 						watcherId = watcherId[:118]
+						break
 					}
 
 					watcherId = append(watcherId, data.Id)
@@ -168,6 +169,7 @@ func AllItems() error {
 		}
 	}
 
+	fmt.Printf("Autosearch - Watching %d of offsale items now.", len(watcherId))
 	fmt.Println("Autosearch - You are ready to go.")
 
 	return nil

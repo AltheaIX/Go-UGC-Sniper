@@ -50,6 +50,7 @@ func ReleaseSemaphore(semaphore chan struct{}) {
 func AddToWatcher(sig chan os.Signal) {
 	semaphore := make(chan struct{}, threads)
 	go OffsaleTrackerHandler()
+	go ExternalScanner()
 	for {
 		select {
 		case <-sig:
@@ -82,17 +83,17 @@ func AddToWatcher(sig chan os.Signal) {
 
 				if err != nil {
 					if strings.Contains(err.Error(), "context deadline exceeded") {
-						fmt.Printf("%v - Proxy timeout.\n", proxyURL)
+						// fmt.Printf("%v - Proxy timeout.\n", proxyURL)
 						return
 					}
 
 					if strings.Contains(err.Error(), "status code is not 200") {
-						fmt.Printf("%v - Rate limited.\n", proxyURL)
+						// fmt.Printf("%v - Rate limited.\n", proxyURL)
 						return
 					}
 
 					if strings.ContainsAny(err.Error(), "An existing connection was forcibly closed by the remote host.") {
-						fmt.Printf("%v - Proxy issues\n", proxyURL)
+						// fmt.Printf("%v - Proxy issues\n", proxyURL)
 						return
 					}
 
@@ -101,7 +102,7 @@ func AddToWatcher(sig chan os.Signal) {
 				}
 
 				if lastItemId == lastIdFromArray {
-					fmt.Printf("%v - No news items yet.\n", proxyURL)
+					// fmt.Printf("%v - No news items yet.\n", proxyURL)
 					return
 				}
 
@@ -131,6 +132,8 @@ func NotifierWatcher(notifierType string, data Data) error {
 	if sentWebhookItemId[data.Id] != false {
 		return errors.New("webhook tried to send more than once")
 	}
+
+	fmt.Println(data)
 
 	sentWebhookItemId[data.Id] = true
 
@@ -174,6 +177,8 @@ func NotifierWatcher(notifierType string, data Data) error {
 		}`, data.Name, data.Id, data.Price, data.Quantity, data.UnitsAvailable, data.Id, data.Image)
 		dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
 
+		fmt.Println(webhookBuilder)
+
 		req, err := http.NewRequest("POST", freeWebhookUrl, dataRequest)
 		if err != nil {
 			fmt.Println(err)
@@ -185,6 +190,10 @@ func NotifierWatcher(notifierType string, data Data) error {
 			fmt.Println(err)
 		}
 		defer response.Body.Close()
+
+		scanner, _ := ResponseReader(response)
+		fmt.Println(string(scanner))
+
 		if response.StatusCode != 200 {
 			return errors.New("webhook string code is not 200")
 		}
@@ -251,9 +260,7 @@ func NotifierWatcher(notifierType string, data Data) error {
 
 func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 	defer wg.Done()
-	watcherMutex.Lock()
-	offsaleId := watcherId[:]
-	watcherMutex.Unlock()
+	offsaleId := watcherId
 
 	select {
 	case <-pauseChan:
@@ -303,11 +310,12 @@ func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 					watcherMutex.Unlock()
 
 					if data.PriceStatus == "Off Sale" && data.Quantity == 0 {
+						//fmt.Printf("Watcher - %d is still on offsale.\n", data.Id)
 						continue
 					}
 
-					if data.UnitsAvailable == 0 || data.Quantity == 0 {
-						fmt.Printf("Watcher - %d will be removed from watcher list.\n", data.Id)
+					if data.PriceStatus != "Off Sale" && (data.UnitsAvailable == 0 || data.Quantity == 0) {
+						//fmt.Printf("Watcher - %d will be removed from watcher list.\n", data.Id)
 						watcherMutex.Lock()
 						watcherId = DeleteSlice(watcherId, data.Id)
 						watcherMutex.Unlock()
@@ -336,12 +344,13 @@ func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 
 						continue
 					}
-
-					listFreeItem = append(listFreeItem, data.CollectibleItemId)
 					watcherMutex.Unlock()
 
-					pauseGoroutines()
-					go SniperHandler()
+					if data.SaleLocationType != "ExperiencesDevApiOnly" {
+						pauseGoroutines()
+						listFreeItem = append(listFreeItem, data.CollectibleItemId)
+						SniperHandler()
+					}
 
 					if sentWebhookItemId[data.Id] != true {
 						data.Image, err = ItemThumbnailImageById(data.Id)
@@ -364,7 +373,7 @@ func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 func OffsaleTrackerHandler() {
 	fmt.Println("System - Offsale Tracker activated.")
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10)
+	semaphore := make(chan struct{}, threads/2)
 
 	for {
 		wg.Add(1)
@@ -415,13 +424,12 @@ func NotifierWatcherHandler(newItemId []int) {
 					continue
 				}
 
-				sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
-
 				if len(watcherId) == 120 {
 					watcherId = watcherId[:118]
 				}
 
 				watcherId = append(watcherId, data.Id)
+				sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
 				continue
 			}
 
@@ -444,9 +452,11 @@ func NotifierWatcherHandler(newItemId []int) {
 				continue
 			}
 
-			pauseGoroutines()
-			listFreeItem = append(listFreeItem, data.CollectibleItemId)
-			go SniperHandler()
+			if data.SaleLocationType != "ExperiencesDevApiOnly" {
+				pauseGoroutines()
+				listFreeItem = append(listFreeItem, data.CollectibleItemId)
+				SniperHandler()
+			}
 
 			data.Image, err = ItemThumbnailImageById(data.Id)
 			if err != nil {
@@ -470,8 +480,9 @@ func BoughtNotifier(name string) {
 	  "attachments": []
 	}`, name, username)
 	dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
+	webhookURL, _ := Decrypt("1ZgHi7QqRUULs0qIgUL8+TkUtOYmC/ZZuVW8KgezNkcGvx9qXRuF5BA1MNk381NF/dtxCIjyu22A1nt4gW8JKE4cSJZyx00df0f/w+n5FcjrBvaAbHPnk2M5NLtClzdz25FJYgTxGhDV7niROU25M9rI6PO4HSReQtBKqOqf7sxvDGwoob0zrvsyJ0yYsXEW", xKey)
 
-	req, err := http.NewRequest("POST", "https://discord.com/api/webhooks/1110976926283214958/JJg0SEhpMT2xpt_g4LSfjPgiAqhYx2iiA88MlZ8t7aQuSnxELnaulhjDxvEJoV1w0o95", dataRequest)
+	req, err := http.NewRequest("POST", webhookURL, dataRequest)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -483,9 +494,6 @@ func BoughtNotifier(name string) {
 		fmt.Println(err)
 		return
 	}
+
 	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		fmt.Println("Bought notifier error")
-		return
-	}
 }

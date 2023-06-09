@@ -121,7 +121,7 @@ func ProxyTester() {
 	_ = ReadProxyFromFile("proxy", true)
 	fmt.Println("Checking proxy, we use 3s timeout for this checker to make sure proxy are fresh and fast.")
 
-	semaphore := make(chan struct{}, threads)
+	semaphore := make(chan struct{}, threads*2)
 
 	for _, data := range newProxy {
 		proxyData := data

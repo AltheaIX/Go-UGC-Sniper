@@ -78,7 +78,6 @@ func LoadConfig() (Config, error) {
 	checkProxy = config.Options.AlwaysCheckProxy
 	threads = config.Options.Threads
 	lastItemId = config.LastId
-	watcherId = config.OffsaleId
 	return config, err
 }
 

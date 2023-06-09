@@ -14,6 +14,9 @@ var accountCookie string
 var accountId int
 
 var listFreeItem []string
+var listSnipedItem []string
+
+var sniperSemaphore = make(chan struct{}, 1)
 
 func UnmarshalMarketplaceDetail(responseRaw []byte) *MarketplaceDetail {
 	marketplaceData := &[]MarketplaceData{}
@@ -28,7 +31,7 @@ func UnmarshalMarketplaceDetail(responseRaw []byte) *MarketplaceDetail {
 }
 
 func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*MarketplaceDetail, error) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 600 * time.Millisecond}
 
 	jsonPayload := fmt.Sprintf(`{"itemIds": ["%v"]}`, collectibleItemId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
@@ -51,6 +54,12 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	req.Header.Set("Connection", "keep-alive")
 	req.AddCookie(cookie)
 
+	now := time.Now()
+	defer func() {
+		elapsed := time.Since(now)
+		fmt.Println("time taken to take detail: ", elapsed)
+	}()
+
 	response, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -67,13 +76,7 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 }
 
 func Sniper(detail *MarketplaceDetail) error {
-	transport := &http.Transport{
-		MaxIdleConns:        10,
-		MaxIdleConnsPerHost: 7,
-		DisableKeepAlives:   false,
-		MaxConnsPerHost:     5,
-	}
-	client := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 600 * time.Millisecond}
 
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
@@ -82,11 +85,13 @@ func Sniper(detail *MarketplaceDetail) error {
 	"expectedPurchaserId": "%d",
 	"expectedPurchaserType": "User",
 	"expectedSellerId": %d,
-	"expectedSellerType": "User",
+	"expectedSellerType": "%v",
 	"idempotencyKey": "%v",
 	"collectibleProductId": "%v"
-}`, detail.Data[0].ItemId, detail.Data[0].Price, accountId, detail.Data[0].CreatorId, uuid.New(), detail.Data[0].ProductId)
+}`, detail.Data[0].ItemId, detail.Data[0].Price, accountId, detail.Data[0].CreatorId, detail.Data[0].CreatorType, uuid.New(), detail.Data[0].ProductId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
+
+	fmt.Println(jsonPayload)
 
 	cookie := &http.Cookie{
 		Name:    ".ROBLOSECURITY",
@@ -101,8 +106,15 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("x-csrf-token", GetCsrfToken())
 	req.AddCookie(cookie)
+
+	now := time.Now()
+	defer func() {
+		elapsed := time.Since(now)
+		fmt.Println("time taken to snipe: ", elapsed)
+	}()
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -110,12 +122,13 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 	defer response.Body.Close()
 
+	scanner, _ := ResponseReader(response)
+	fmt.Println(string(scanner))
 	if response.StatusCode != 200 {
 		err = errors.New(fmt.Sprintf("error code is %d", response.StatusCode))
 		return err
 	}
 
-	scanner, _ := ResponseReader(response)
 	if strings.Contains(string(scanner), "QuantityExhausted") {
 		err = errors.New("sold out")
 		return err
@@ -131,44 +144,44 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 
 	go BoughtNotifier(detail.Data[0].Name)
-	fmt.Println(string(scanner))
 	time.Sleep(1 * time.Second)
 	return nil
 }
 
 func SniperHandler() {
 	for _, data := range listFreeItem {
-		now := time.Now()
-
-		detail, err := MarketplaceDetailByCollectibleItemId(data)
-		if err != nil {
-			fmt.Println(err)
-			return
+		for _, dataSniped := range listSnipedItem {
+			if dataSniped == data {
+				listFreeItem = DeleteSlice(listFreeItem, data)
+				resumeGoroutines()
+				return
+			}
 		}
 
-		fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
 		for {
-			defer func() {
-				elapsed := time.Since(now)
-				elapsedMilliseconds := int64(elapsed / time.Millisecond)
+			sniperSemaphore <- struct{}{}
 
-				fmt.Printf("Sniper - Sniped within %d milliseconds\n", elapsedMilliseconds)
-			}()
+			detail, err := MarketplaceDetailByCollectibleItemId(data)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 
+			fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
 			err = Sniper(detail)
 			if err != nil && err.Error() == "sold out" {
 				fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
 				listFreeItem = DeleteSlice(listFreeItem, data)
-				break
 			}
 
-			if err != nil {
+			if err != nil && err.Error() != "sold out" {
 				listFreeItem = DeleteSlice(listFreeItem, data)
-				break
 			}
+
+			listSnipedItem = append(listSnipedItem, data)
+			<-sniperSemaphore
+			break
 		}
 	}
-
-	time.Sleep(1 * time.Second)
 	resumeGoroutines()
 }

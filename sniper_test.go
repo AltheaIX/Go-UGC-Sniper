@@ -52,7 +52,8 @@ func TestSniper(t *testing.T) {
 	LoadConfig()
 	GetAccountDetails(accountCookie)
 
-	listFreeItem = append(listFreeItem, "7a88889e-70b0-4bc8-afa2-ceacb67d7b84")
+	// listSnipedItem = append(listSnipedItem, "a93314fe-0deb-4499-a490-ecdfd95e1c67")
+	listFreeItem = append(listFreeItem, "a93314fe-0deb-4499-a490-ecdfd95e1c67")
 
 	SniperHandler()
 }
