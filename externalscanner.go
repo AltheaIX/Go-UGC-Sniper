@@ -42,7 +42,7 @@ func MakeRequestExternalScanner(urlLink string) (*http.Response, error) {
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
-	authorizationKey, _ := Decrypt("IC/RU5JLHVXAt+TBkNMzGaWuZqxVdDizZ5A7T8yYGRlaAQ5fdTXpgG+H59yavFkElRXDY4hLPdDRPfDCcUXODaQA4JHjvaEGZQc4KJXBIIHwvydU7uAbcSNcBExe2SOM", xKey)
+	authorizationKey, _ := Decrypt("xIJmFB84c2IQ84MdvxZf44oiXDD0Qdmwd/rxpaOFY5jXJMGioMvNOcfKG4E/dJkInsFLOFICGf7JdRlRDJCQbKGOQSZ77GBqLcb77hiPLK0jEo/VRK+QSR35lqubQq11", xKey)
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
@@ -84,9 +84,7 @@ func ExternalScanner() {
 			}()
 
 			for {
-				urlLink, _ := Decrypt("ePZKQrzSNR8O58R+Badoos2o4qh3bi4Y1YzWs0tepQke4y+XZ3pj+15qma92TJabziivo7H0CP9z2OtuTpvSsw==", xKey)
-
-				response, err := MakeRequestExternalScanner(urlLink)
+				response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50")
 				if err != nil {
 					continue
 				}

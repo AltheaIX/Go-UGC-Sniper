@@ -20,9 +20,8 @@ func TestUnmarshalDiscord(t *testing.T) {
 }
 
 func TestMakeRequestExternalScanner(t *testing.T) {
-	urlLink, _ := Decrypt("ePZKQrzSNR8O58R+Badoos2o4qh3bi4Y1YzWs0tepQke4y+XZ3pj+15qma92TJabziivo7H0CP9z2OtuTpvSsw==", xKey)
 
-	response, err := MakeRequestExternalScanner(urlLink)
+	response, err := MakeRequestExternalScanner("")
 	if err != nil {
 		t.Error(err)
 	}
