@@ -19,6 +19,7 @@ var proxyList []string
 var newProxy []string
 var checkProxy bool
 
+// Note: if forced setted to true, it means it will check the proxy no matter what
 func ReadProxyFromFile(fileName string, forced bool) error {
 	file, err := os.Open(fileName + ".txt") // Replace with the path to your file
 	if err != nil {

@@ -1,12 +1,10 @@
 package main
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"sort"
-	"time"
 )
 
 var allItems []int
@@ -19,30 +17,6 @@ func UnmarshalListItem(responseRaw []byte) (*ListItem, error) {
 		return listItem, err
 	}
 	return listItem, nil
-}
-
-func MakeRequest(url string) (*http.Response, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: 6 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-
-	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
-	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Content-Type", "application/json")
-
-	response, err := client.Do(req)
-	if err != nil {
-		return response, err
-	}
-
-	return response, nil
 }
 
 func AllItems() error {

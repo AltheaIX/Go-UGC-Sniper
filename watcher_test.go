@@ -102,5 +102,13 @@ func TestNotifierWatcherHandler(t *testing.T) {
 func TestBoughtNotifier(t *testing.T) {
 	LoadConfig()
 	GetAccountDetails(accountCookie)
-	BoughtNotifier("test")
+
+	detail, err := MarketplaceDetailByCollectibleItemId("71053164-baa8-449a-b131-f7fd96d68278")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_name := strings.Replace(string(detail.Data[0].Name), `"`, "", 2)
+	detail.Data[0].Name = jsoniter.RawMessage(_name)
+	t.Log(fmt.Sprintf("%s", detail.Data[0].Name))
 }

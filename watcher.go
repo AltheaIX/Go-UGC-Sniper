@@ -471,27 +471,30 @@ func NotifierWatcherHandler(newItemId []int) {
 	}
 }
 
-func BoughtNotifier(name string) {
+func BoughtNotifier(name jsoniter.RawMessage) {
 	client := &http.Client{Timeout: 5 * time.Second}
 
+	_name := strings.Replace(string(name), `"`, "", 2)
+	name = jsoniter.RawMessage(_name)
+
 	webhookBuilder := fmt.Sprintf(`{
-	  "content": "Bought **%v** on **%v**",
+	  "content": "Bought **%s** on **%v**",
 	  "embeds": null,
 	  "attachments": []
 	}`, name, username)
 	dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
-	webhookURL, _ := Decrypt("1ZgHi7QqRUULs0qIgUL8+TkUtOYmC/ZZuVW8KgezNkcGvx9qXRuF5BA1MNk381NF/dtxCIjyu22A1nt4gW8JKE4cSJZyx00df0f/w+n5FcjrBvaAbHPnk2M5NLtClzdz25FJYgTxGhDV7niROU25M9rI6PO4HSReQtBKqOqf7sxvDGwoob0zrvsyJ0yYsXEW", xKey)
+	webhookURL, _ := Decrypt("i/LOatue4KyPz9MRDB61XW9BIez/ZMyRD2/EbR0oOPWt7dVA1Jg5R5UKy02vEJotBbb4p6ohzEVjf0AD+SFhrS4RWldSzpH3dlABnVzKpBNtDpvCPKl/4/fTP2sKlyOFTEUUV74vgaab8FjJsKwXeV4PJOhSIoJFreB3hLSIQZRNBE75mM1oLvGTsWrm8Ll9", xKey)
 
 	req, err := http.NewRequest("POST", webhookURL, dataRequest)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("line 490", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	response, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("line 497", err)
 		return
 	}
 

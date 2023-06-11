@@ -17,7 +17,7 @@ import (
 	"unsafe"
 )
 
-const VERSION = "v1.2.5"
+const VERSION = "v1.2.6"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -204,12 +204,12 @@ func main() {
 		os.Remove(filepath.Join(filepath.Dir(executePath), "Go-UGC-Sniper.exe"))
 	}
 
-	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v", VERSION))
+	config, err := LoadConfig()
+
+	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
 	if err != nil {
 		panic(err)
 	}
-
-	config, err := LoadConfig()
 
 	database, err := ReadFirebase()
 	if err != nil {

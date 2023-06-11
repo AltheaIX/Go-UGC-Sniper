@@ -63,10 +63,13 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	response, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
+		return nil, err
 	}
 	defer response.Body.Close()
+
 	if response.StatusCode != 200 {
 		err = errors.New("status code is not 200")
+		return nil, err
 	}
 
 	scanner, _ := ResponseReader(response)
@@ -144,6 +147,7 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 
 	go BoughtNotifier(detail.Data[0].Name)
+	fmt.Println(string(scanner))
 	time.Sleep(1 * time.Second)
 	return nil
 }

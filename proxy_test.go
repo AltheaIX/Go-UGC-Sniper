@@ -25,7 +25,7 @@ func TestCheckRequestProxy(t *testing.T) {
 }
 
 func TestReadProxyFromFile(t *testing.T) {
-	err := ReadProxyFromFile("proxy_fresh", false)
+	err := ReadProxyFromFile("proxy_fresh", true)
 	t.Log(err)
 }
 

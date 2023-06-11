@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"net/url"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -17,6 +20,34 @@ func TestUnmarshalDiscord(t *testing.T) {
 
 	t.Log(string(scanner))
 	t.Log(discord[0].Content)
+}
+
+func TestMakeRequestExternalScannerProxied(t *testing.T) {
+	err := ReadProxyFromFile("proxy_fresh", true)
+	t.Log(err)
+
+	semaphore := make(chan struct{}, 10)
+
+	for {
+		semaphore <- struct{}{}
+		go func() {
+			defer func() {
+				<-semaphore
+			}()
+			proxyURL, err := url.Parse(strings.TrimRight("http://"+proxyList[rand.Intn(len(proxyList)-1)], "\x00"))
+			if err != nil {
+				t.Log(err)
+			}
+
+			response, err := MakeRequestExternalScannerProxied(proxyURL, "https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50")
+			if err != nil {
+				return
+			}
+
+			scanner, _ := ResponseReader(response)
+			t.Log(string(scanner))
+		}()
+	}
 }
 
 func TestMakeRequestExternalScanner(t *testing.T) {
@@ -69,6 +100,8 @@ func TestMakeRequestExternalScanner(t *testing.T) {
 func TestExternalScanner(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
+	firstExternalScanner = false
+	lastExternalScannerId = 13683406501
 	LoadConfig()
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	go ExternalScanner()
