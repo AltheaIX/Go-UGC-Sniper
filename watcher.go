@@ -133,8 +133,6 @@ func NotifierWatcher(notifierType string, data Data) error {
 		return errors.New("webhook tried to send more than once")
 	}
 
-	fmt.Println(data)
-
 	sentWebhookItemId[data.Id] = true
 
 	switch notifierType {
@@ -177,8 +175,6 @@ func NotifierWatcher(notifierType string, data Data) error {
 		}`, data.Name, data.Id, data.Price, data.Quantity, data.UnitsAvailable, data.Id, data.Image)
 		dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
 
-		fmt.Println(webhookBuilder)
-
 		req, err := http.NewRequest("POST", freeWebhookUrl, dataRequest)
 		if err != nil {
 			fmt.Println(err)
@@ -190,9 +186,6 @@ func NotifierWatcher(notifierType string, data Data) error {
 			fmt.Println(err)
 		}
 		defer response.Body.Close()
-
-		scanner, _ := ResponseReader(response)
-		fmt.Println(string(scanner))
 
 		if response.StatusCode != 200 {
 			return errors.New("webhook string code is not 200")
@@ -473,9 +466,6 @@ func NotifierWatcherHandler(newItemId []int) {
 
 func BoughtNotifier(name jsoniter.RawMessage) {
 	client := &http.Client{Timeout: 5 * time.Second}
-
-	_name := strings.Replace(string(name), `"`, "", 2)
-	name = jsoniter.RawMessage(_name)
 
 	webhookBuilder := fmt.Sprintf(`{
 	  "content": "Bought **%s** on **%v**",

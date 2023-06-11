@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	jsoniter "github.com/json-iterator/go"
+	"strings"
+	"testing"
+)
 
 func TestUnmarshalMarketplaceDetail(t *testing.T) {
 	// responseRaw, err := MarketplaceDetailByCollectibleItemId("50987837-dc54-48cf-a1f0-f96ad1a26a32")
@@ -45,7 +49,10 @@ func TestMarketplaceDetailByCollectibleItemId(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	t.Log(detail)
+
+	_name := strings.Replace(string(detail.Data[0].Name), `"`, "", 2)
+	detail.Data[0].Name = jsoniter.RawMessage(_name)
+	t.Log(detail.Data[0].Name)
 }
 
 func TestSniper(t *testing.T) {

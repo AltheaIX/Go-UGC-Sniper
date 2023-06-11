@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"strings"
 	"time"
@@ -171,10 +172,13 @@ func SniperHandler() {
 				continue
 			}
 
-			fmt.Printf("Sniper - Sniping items %v\n", detail.Data[0].Name)
+			_name := strings.Replace(string(detail.Data[0].Name), `"`, "", 2)
+			detail.Data[0].Name = jsoniter.RawMessage(_name)
+
+			fmt.Printf("Sniper - Sniping items %s\n", detail.Data[0].Name)
 			err = Sniper(detail)
 			if err != nil && err.Error() == "sold out" {
-				fmt.Printf("Sniper - %v already sold out.\n", detail.Data[0].Name)
+				fmt.Printf("Sniper - %s already sold out.\n", detail.Data[0].Name)
 				listFreeItem = DeleteSlice(listFreeItem, data)
 			}
 

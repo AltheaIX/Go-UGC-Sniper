@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"math/rand"
@@ -85,6 +86,10 @@ func MakeRequestExternalScannerProxied(proxyURL *url.URL, urlLink string) (*http
 	response, err := client.Do(req)
 	if err != nil {
 		return response, err
+	}
+
+	if response.StatusCode != 200 {
+		return response, errors.New(fmt.Sprintf("status code is %d", response.StatusCode))
 	}
 
 	return response, nil
