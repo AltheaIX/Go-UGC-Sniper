@@ -118,7 +118,7 @@ func Sniper(detail *MarketplaceDetail) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken(transport))
+	req.Header.Set("x-csrf-token", GetCsrfToken(transport, cookie))
 	req.AddCookie(cookie)
 
 	now := time.Now()
@@ -155,7 +155,6 @@ func Sniper(detail *MarketplaceDetail) error {
 	}
 
 	go BoughtNotifier(detail.Data[0].Name)
-	fmt.Println(string(scanner))
 	time.Sleep(1 * time.Second)
 	return nil
 }

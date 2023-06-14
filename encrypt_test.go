@@ -16,7 +16,7 @@ func TestEncrypt(t *testing.T) {
 }
 
 func TestDecrypt(t *testing.T) {
-	encryptedText := "i/LOatue4KyPz9MRDB61XW9BIez/ZMyRD2/EbR0oOPWt7dVA1Jg5R5UKy02vEJotBbb4p6ohzEVjf0AD+SFhrS4RWldSzpH3dlABnVzKpBNtDpvCPKl/4/fTP2sKlyOFTEUUV74vgaab8FjJsKwXeV4PJOhSIoJFreB3hLSIQZRNBE75mM1oLvGTsWrm8Ll9"
+	encryptedText := "3xkarmSuNsZFHzgRcKyj2YO2zEQE/mSqEuB0ob5CvMH71p51egAdvAFIQif+WC79mzGBnUos64nWAJn1uLHxDQ=="
 	decryptedText, err := Decrypt(encryptedText, xKey)
 	if err != nil {
 		t.Error(err)

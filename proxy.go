@@ -61,7 +61,7 @@ func ReadProxyFromFile(fileName string, forced bool) error {
 }
 
 func WriteProxyToFile(proxyList []string) {
-	file, err := os.Create("proxy_fresh.txt")
+	file, err := os.OpenFile("proxy_fresh.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		panic(err)
 	}

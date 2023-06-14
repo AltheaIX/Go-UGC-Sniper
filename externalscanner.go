@@ -4,9 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
-	"math/rand"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -32,7 +30,7 @@ func UnmarshalDiscord(responseRaw []byte) *Discord {
 }
 
 func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*http.Response, error) {
-	// now := time.Now()
+	//now := time.Now()
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   6 * time.Second,
@@ -44,7 +42,6 @@ func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*htt
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Authorization", "Njg5MzQ4MDU4MDkzMzIyMjQx.GdTkHL.Cika-mUJjd86moVeZXRF-wcn9eusxzNlxLTmRA")
 	req.Header.Set("Content-Type", "application/json")
 
 	response, err := client.Do(req)
@@ -83,20 +80,24 @@ func ExternalScanner() {
 				<-semaphore
 			}()
 
-			proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
+			/*proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
 			if err != nil {
 				return
-			}
+			}*/
 
 			transport := &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},
 			}
 
 			for {
-				response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+				urlLink, err := Decrypt("3xkarmSuNsZFHzgRcKyj2YO2zEQE/mSqEuB0ob5CvMH71p51egAdvAFIQif+WC79mzGBnUos64nWAJn1uLHxDQ==", xKey)
+				if err != nil {
+					continue
+				}
+
+				response, err := MakeRequestExternalScanner(urlLink, transport)
 				if err != nil {
 					continue
 				}

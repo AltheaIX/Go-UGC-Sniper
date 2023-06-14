@@ -479,6 +479,9 @@ func BoughtNotifier(name jsoniter.RawMessage) {
 	  "attachments": []
 	}`, name, username)
 	dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
+
+	fmt.Println(webhookBuilder)
+
 	webhookURL, _ := Decrypt("i/LOatue4KyPz9MRDB61XW9BIez/ZMyRD2/EbR0oOPWt7dVA1Jg5R5UKy02vEJotBbb4p6ohzEVjf0AD+SFhrS4RWldSzpH3dlABnVzKpBNtDpvCPKl/4/fTP2sKlyOFTEUUV74vgaab8FjJsKwXeV4PJOhSIoJFreB3hLSIQZRNBE75mM1oLvGTsWrm8Ll9", xKey)
 
 	req, err := http.NewRequest("POST", webhookURL, dataRequest)
@@ -493,6 +496,9 @@ func BoughtNotifier(name jsoniter.RawMessage) {
 		fmt.Println("line 497", err)
 		return
 	}
+
+	scanner, _ := ResponseReader(response)
+	fmt.Println(string(scanner))
 
 	defer response.Body.Close()
 }

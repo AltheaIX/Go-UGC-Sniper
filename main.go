@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const VERSION = "v1.2.6"
+const VERSION = "v1.2.7"
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var listId []int
@@ -175,10 +175,9 @@ func AutoUpdate(executePath string) {
 	}
 
 	return nil
-}*/
+}
 
-// Comment this for linux build
-/*func isDebuggerPresent() {
+func isDebuggerPresent() {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	procCheckRemoteDebuggerPresent := kernel32.NewProc("CheckRemoteDebuggerPresent")
 	var isDebuggerPresent int32
@@ -219,7 +218,7 @@ func main() {
 	defer handlePanic()
 
 	// Comment this for linux build
-	// isDebuggerPresent()
+	/*	isDebuggerPresent()*/
 
 	executePath, err := os.Executable()
 	if err != nil {
@@ -233,10 +232,10 @@ func main() {
 	config, err := LoadConfig()
 
 	// Comment this for linux build
-	/*	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
-		if err != nil {
-			panic(err)
-		}*/
+	/*err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
+	if err != nil {
+		panic(err)
+	}*/
 
 	database, err := ReadFirebase()
 	if err != nil {

@@ -11,17 +11,9 @@ import (
 	"time"
 )
 
-func GetCsrfToken(transport *http.Transport) string {
+func GetCsrfToken(transport *http.Transport, cookie *http.Cookie) string {
 	var token string
 	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
-
-	cookie := &http.Cookie{
-		Name:    ".ROBLOSECURITY",
-		Value:   accountCookie,
-		Path:    "/",
-		Domain:  "roblox.com",
-		Expires: time.Now().Add(time.Hour * 1000),
-	}
 
 	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
 	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
@@ -32,7 +24,10 @@ func GetCsrfToken(transport *http.Transport) string {
 		return token
 	}
 
-	req.AddCookie(cookie)
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Content-Type", "application/json")
@@ -135,7 +130,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken(transport))
+	req.Header.Set("x-csrf-token", GetCsrfToken(transport, nil))
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -199,7 +194,7 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken(transport))
+	req.Header.Set("x-csrf-token", GetCsrfToken(transport, cookie))
 
 	response, err := client.Do(req)
 	if err != nil {
