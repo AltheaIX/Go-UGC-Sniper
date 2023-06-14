@@ -55,17 +55,17 @@ func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*htt
 	return response, nil
 }
 
-func RegexUrlToID(url string) (int, error) {
+func RegexUrlToID(url string) int {
 	pattern := `https:\/\/www\.roblox\.com\/catalog\/(\d+)`
 	regex := regexp.MustCompile(pattern)
 	matches := regex.FindStringSubmatch(url)
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		fmt.Println(err)
-		return id, err
+		return id
 	}
 
-	return id, nil
+	return id
 }
 
 func ExternalScanner() {
@@ -75,7 +75,7 @@ func ExternalScanner() {
 
 	for {
 		semaphore <- struct{}{}
-		go func() {
+		go func(previousLastId int) {
 			defer func() {
 				<-semaphore
 			}()
@@ -114,15 +114,11 @@ func ExternalScanner() {
 				pointerDiscord := UnmarshalDiscord(scanner)
 				discord := *pointerDiscord
 
-				if len(discord) <= 0 {
+				if len(discord) <= 0 || len(discord[0].Embeds) <= 0 {
 					continue
 				}
 
-				lastId, err := RegexUrlToID(discord[0].Embeds[0].URL)
-				if err != nil {
-					fmt.Println(discord[0].Embeds[0].URL)
-					continue
-				}
+				lastId := RegexUrlToID(discord[0].Embeds[0].URL)
 
 				externalScannerMutex.Lock()
 				if firstExternalScanner != false {
@@ -137,13 +133,10 @@ func ExternalScanner() {
 						continue
 					}
 
-					itemId, err := RegexUrlToID(discordData.Embeds[0].URL)
-					if err != nil {
-						fmt.Println(discord[0].Embeds[0].URL)
-						continue
-					}
+					itemId := RegexUrlToID(discordData.Embeds[0].URL)
 
-					if itemId == lastExternalScannerId {
+					// This need to be copy of lastExternalScannerId because if an goroutine complete the execution, it will resulting changing lastExternalScannerId which is Global Variable.
+					if itemId == previousLastId {
 						break
 					}
 
@@ -154,7 +147,6 @@ func ExternalScanner() {
 						}
 
 						data := details.Detail[0]
-						fmt.Println(data)
 
 						if data.UnitsAvailable <= 0 {
 							break
@@ -182,9 +174,11 @@ func ExternalScanner() {
 					}
 				}
 
+				externalScannerMutex.Lock()
 				lastExternalScannerId = lastId
+				externalScannerMutex.Unlock()
 				break
 			}
-		}()
+		}(lastExternalScannerId)
 	}
 }

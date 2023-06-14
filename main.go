@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 const VERSION = "v1.2.7"
@@ -157,7 +158,7 @@ func AutoUpdate(executePath string) {
 }
 
 // Comment this for linux build
-/*func setConsoleTitle(title string) error {
+func setConsoleTitle(title string) error {
 	handle, err := syscall.LoadLibrary("kernel32.dll")
 	if err != nil {
 		return err
@@ -191,7 +192,7 @@ func isDebuggerPresent() {
 		time.Sleep(10 * time.Second)
 		os.Exit(1)
 	}
-}*/
+}
 
 func handlePanic() {
 	if r := recover(); r != nil {
@@ -218,7 +219,7 @@ func main() {
 	defer handlePanic()
 
 	// Comment this for linux build
-	/*	isDebuggerPresent()*/
+	isDebuggerPresent()
 
 	executePath, err := os.Executable()
 	if err != nil {
@@ -232,10 +233,10 @@ func main() {
 	config, err := LoadConfig()
 
 	// Comment this for linux build
-	/*err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
+	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
 	if err != nil {
 		panic(err)
-	}*/
+	}
 
 	database, err := ReadFirebase()
 	if err != nil {
