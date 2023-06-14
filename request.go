@@ -11,9 +11,18 @@ import (
 	"time"
 )
 
-func GetCsrfToken(transport *http.Transport, cookie *http.Cookie) string {
+func GetCsrfTokenProxied(proxyURL *url.URL) string {
 	var token string
-	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: 6 * time.Second,
+	}
 
 	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
 	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
@@ -24,10 +33,48 @@ func GetCsrfToken(transport *http.Transport, cookie *http.Cookie) string {
 		return token
 	}
 
-	if cookie != nil {
-		req.AddCookie(cookie)
+	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-csrf-token", "xcsrf")
+
+	response, err := client.Do(req)
+	if err != nil {
+		//fmt.Printf("Error: %v - GetCsrfToken\n", err)
+		return token
+	}
+	defer response.Body.Close()
+
+	if response.Header.Get("x-csrf-token") != "" {
+		token = response.Header.Get("x-csrf-token")
 	}
 
+	time.Sleep(0 * time.Second)
+	return token
+}
+
+func GetCsrfToken() string {
+	var token string
+	client := &http.Client{Timeout: 3 * time.Second}
+
+	cookie := &http.Cookie{
+		Name:    ".ROBLOSECURITY",
+		Value:   accountCookie,
+		Path:    "/",
+		Domain:  "roblox.com",
+		Expires: time.Now().Add(time.Hour * 1000),
+	}
+
+	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
+	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
+
+	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
+	if err != nil {
+		// fmt.Printf("Error: %v - GetCsrfToken\n", err)
+		return token
+	}
+
+	req.AddCookie(cookie)
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Content-Type", "application/json")
@@ -130,7 +177,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken(transport, nil))
+	req.Header.Set("x-csrf-token", GetCsrfTokenProxied(proxyURL))
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -161,11 +208,6 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	var err error
 
 	client := &http.Client{Timeout: 3 * time.Second}
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
 
 	cookie := &http.Cookie{
 		Name:    ".ROBLOSECURITY",
@@ -194,7 +236,7 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken(transport, cookie))
+	req.Header.Set("x-csrf-token", GetCsrfToken())
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -202,13 +244,13 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	}
 	defer response.Body.Close()
 
+	scanner, _ := ResponseReader(response)
+
 	if response.StatusCode != 200 {
+		fmt.Println(string(scanner))
 		err = errors.New("status code is not 200")
-		fmt.Println("ItemDetail - Rate limit, Item notifier maybe delayed!")
 		return itemDetail, err
 	}
-
-	scanner, _ := ResponseReader(response)
 
 	itemDetail, err = UnmarshalCatalog(scanner)
 	if err != nil {

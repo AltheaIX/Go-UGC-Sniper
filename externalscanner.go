@@ -49,29 +49,29 @@ func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*htt
 		return response, err
 	}
 
-	/*elapsed := time.Since(now)
-	fmt.Println(elapsed)*/
+	/*	elapsed := time.Since(now)
+		fmt.Println(elapsed)*/
 
 	return response, nil
 }
 
-func RegexUrlToID(url string) int {
+func RegexUrlToID(url string) (int, error) {
 	pattern := `https:\/\/www\.roblox\.com\/catalog\/(\d+)`
 	regex := regexp.MustCompile(pattern)
 	matches := regex.FindStringSubmatch(url)
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		fmt.Println(err)
-		return id
+		return id, err
 	}
 
-	return id
+	return id, nil
 }
 
 func ExternalScanner() {
 	defer handlePanic()
 
-	semaphore := make(chan struct{}, threads)
+	semaphore := make(chan struct{}, 3)
 
 	for {
 		semaphore <- struct{}{}
@@ -118,7 +118,11 @@ func ExternalScanner() {
 					continue
 				}
 
-				lastId := RegexUrlToID(discord[0].Embeds[0].URL)
+				lastId, err := RegexUrlToID(discord[0].Embeds[0].URL)
+				if err != nil {
+					fmt.Println(discord[0].Embeds[0].URL)
+					continue
+				}
 
 				externalScannerMutex.Lock()
 				if firstExternalScanner != false {
@@ -129,7 +133,15 @@ func ExternalScanner() {
 				externalScannerMutex.Unlock()
 
 				for _, discordData := range discord {
-					itemId := RegexUrlToID(discordData.Embeds[0].URL)
+					if len(discordData.Embeds) <= 0 {
+						continue
+					}
+
+					itemId, err := RegexUrlToID(discordData.Embeds[0].URL)
+					if err != nil {
+						fmt.Println(discord[0].Embeds[0].URL)
+						continue
+					}
 
 					if itemId == lastExternalScannerId {
 						break
@@ -140,14 +152,15 @@ func ExternalScanner() {
 						if err != nil {
 							continue
 						}
+
 						data := details.Detail[0]
+						fmt.Println(data)
 
 						if data.UnitsAvailable <= 0 {
 							break
 						}
 
 						if data.SaleLocationType != "ExperiencesDevApiOnly" {
-							pauseGoroutines()
 							listFreeItem = append(listFreeItem, data.CollectibleItemId)
 							SniperHandler()
 						}

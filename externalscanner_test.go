@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"net/url"
+	"regexp"
+	"strconv"
 	"sync"
 	"testing"
 )
@@ -43,19 +43,23 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 				<-semaphore
 			}()
 
-			proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
+			/*proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
 			if err != nil {
 				t.Log(err)
-			}
+			}*/
 
 			transport := &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},
 			}
 
-			response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+			urlLink, err := Decrypt("3xkarmSuNsZFHzgRcKyj2YO2zEQE/mSqEuB0ob5CvMH71p51egAdvAFIQif+WC79mzGBnUos64nWAJn1uLHxDQ==", xKey)
+			if err != nil {
+				return
+			}
+
+			response, err := MakeRequestExternalScanner(urlLink, transport)
 			if err != nil {
 				return
 			}
@@ -84,45 +88,45 @@ func TestMakeRequestExternalScanner(t *testing.T) {
 	discord := *pointerDiscord
 
 	fmt.Println(discord)
-	/*	lastExternalScannerId = 13675149661*/
+	lastExternalScannerId = 13675149661
 
-	/*	for i, data := range discord {
-			if len(data.Embeds) < 1 {
-				continue
-			}
-
-			url := data.Embeds[0].URL
-			pattern := `https:\/\/www\.roblox\.com\/catalog\/(\d+)`
-			regex := regexp.MustCompile(pattern)
-			matches := regex.FindStringSubmatch(url)
-
-			if len(matches) < 1 {
-				continue
-			}
-
-			itemId, err := strconv.Atoi(matches[1])
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			if i == 0 {
-				if lastExternalScannerId == itemId {
-					break
-				}
-
-				lastExternalScannerId = itemId
-			}
+	for i, data := range discord {
+		if len(data.Embeds) < 1 {
+			continue
 		}
 
-		t.Log("Last Id:", lastExternalScannerId)*/
+		url := data.Embeds[0].URL
+		pattern := `https:\/\/www\.roblox\.com\/catalog\/(\d+)`
+		regex := regexp.MustCompile(pattern)
+		matches := regex.FindStringSubmatch(url)
+
+		if len(matches) < 1 {
+			continue
+		}
+
+		itemId, err := strconv.Atoi(matches[1])
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		if i == 0 {
+			if lastExternalScannerId == itemId {
+				break
+			}
+
+			lastExternalScannerId = itemId
+		}
+	}
+
+	t.Log("Last Id:", lastExternalScannerId)
 }
 
 func TestExternalScanner(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	firstExternalScanner = false
-	lastExternalScannerId = 13683406501
+	lastExternalScannerId = 13744629331
 	LoadConfig()
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	go ExternalScanner()

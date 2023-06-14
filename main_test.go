@@ -1,11 +1,8 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"testing"
-	"time"
 )
 
 func TestUnmarshalCatalog(t *testing.T) {
@@ -17,21 +14,8 @@ func TestUnmarshalCatalog(t *testing.T) {
 
 func TestGetCsrfToken(t *testing.T) {
 	LoadConfig()
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
 
-	cookie := &http.Cookie{
-		Name:    ".ROBLOSECURITY",
-		Path:    "/",
-		Value:   accountCookie,
-		Domain:  "roblox.com",
-		Expires: time.Now().Add(time.Hour * 1000),
-	}
-
-	token := GetCsrfToken(transport, cookie)
+	token := GetCsrfToken()
 	fmt.Println(token)
 }
 

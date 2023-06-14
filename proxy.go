@@ -81,7 +81,7 @@ func WriteProxyToFile(proxyList []string) {
 func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 	defer wg.Done()
 	fmt.Println("Checking, ", data)
-	proxyURL, err := url.Parse(strings.TrimRight("http://"+data, "\x00"))
+	proxyURL, err := url.Parse(BuildProxyURL(data))
 
 	if err != nil {
 		return errors.New("error on parse")
