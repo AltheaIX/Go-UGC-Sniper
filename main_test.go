@@ -6,7 +6,7 @@ import (
 )
 
 func TestUnmarshalCatalog(t *testing.T) {
-	responseRaw, _, _ := ItemRecentlyAdded()
+	responseRaw, _, _ := ItemRecentlyAdded("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories")
 	jsonResp, _ := UnmarshalCatalog(responseRaw)
 
 	fmt.Println(jsonResp.Detail[0].Id)
@@ -22,7 +22,7 @@ func TestGetCsrfToken(t *testing.T) {
 func TestItemRecentlyAdded(t *testing.T) {
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	for {
-		responseByte, _, err := ItemRecentlyAdded()
+		responseByte, _, err := ItemRecentlyAdded("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories")
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -69,7 +69,7 @@ func TestItemDetailById(t *testing.T) {
 }
 
 func TestItemRecentlyAddedAppend(t *testing.T) {
-	listItems, _, _ := ItemRecentlyAddedAppend(ItemRecentlyAdded())
+	listItems, _, _ := ItemRecentlyAddedAppend(ItemRecentlyAdded("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories"))
 	fmt.Println(listItems)
 }
 

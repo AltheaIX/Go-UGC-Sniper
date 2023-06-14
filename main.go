@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -207,7 +208,10 @@ func handlePanic() {
 		log.SetOutput(file)
 
 		// Log the panic details to crash_log.txt
-		log.Printf("Panic occurred: %v", r)
+		var buf [4096]byte
+		n := runtime.Stack(buf[:], false)
+
+		log.Printf("Panic occurred: %v\n\n%s\n", r, buf[:n])
 
 		// Re-panic to ensure the program terminates
 		panic(r)

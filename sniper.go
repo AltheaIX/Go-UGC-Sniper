@@ -75,6 +75,7 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	}
 
 	scanner, _ := ResponseReader(response)
+	fmt.Println(string(scanner))
 
 	marketplaceDetail := UnmarshalMarketplaceDetail(scanner)
 	return marketplaceDetail, err
@@ -87,7 +88,7 @@ func Sniper(detail *MarketplaceDetail) error {
 		},
 	}
 
-	client := &http.Client{Transport: transport, Timeout: 600 * time.Millisecond}
+	client := &http.Client{Transport: transport, Timeout: 2000 * time.Millisecond}
 
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
@@ -163,6 +164,9 @@ func SniperHandler() {
 	defer handlePanic()
 
 	for _, data := range listFreeItem {
+		var detail *MarketplaceDetail
+		var err error
+
 		for _, dataSniped := range listSnipedItem {
 			if dataSniped == data {
 				listFreeItem = DeleteSlice(listFreeItem, data)
@@ -172,13 +176,22 @@ func SniperHandler() {
 		}
 
 		for {
-			sniperSemaphore <- struct{}{}
-
-			detail, err := MarketplaceDetailByCollectibleItemId(data)
+			detail, err = MarketplaceDetailByCollectibleItemId(data)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
+
+			if detail.Data[0].CreatorType == "" || detail.Data[0].CreatorId == 0 || detail.Data[0].ProductId == "" {
+				fmt.Println("Sniper - Failed to take detail, retrying...")
+				continue
+			}
+
+			break
+		}
+
+		for {
+			sniperSemaphore <- struct{}{}
 
 			_name := strings.Replace(string(detail.Data[0].Name), `"`, "", 2)
 			detail.Data[0].Name = jsoniter.RawMessage(_name)

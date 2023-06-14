@@ -95,7 +95,7 @@ func GetCsrfToken() string {
 	return token
 }
 
-func ItemRecentlyAdded() ([]byte, *url.URL, error) {
+func ItemRecentlyAdded(urlLink string) ([]byte, *url.URL, error) {
 	proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
 	if err != nil {
 		fmt.Printf("Error: %v - Parser Proxy\n", err)
@@ -112,7 +112,7 @@ func ItemRecentlyAdded() ([]byte, *url.URL, error) {
 		Timeout: 6 * time.Second,
 	}
 
-	req, err := http.NewRequest("GET", "https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories", nil)
+	req, err := http.NewRequest("GET", urlLink, nil)
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
@@ -247,6 +247,10 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	scanner, _ := ResponseReader(response)
 
 	if response.StatusCode != 200 {
+		/*
+			pc, _, line, _ := runtime.Caller(1)
+			callingFunc := runtime.FuncForPC(pc).Name()
+			fmt.Println(string(scanner), callingFunc, line)*/
 		fmt.Println(string(scanner))
 		err = errors.New("status code is not 200")
 		return itemDetail, err

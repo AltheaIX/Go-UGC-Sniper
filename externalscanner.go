@@ -16,6 +16,9 @@ var lastExternalScannerId int
 var firstExternalScanner = true
 var scannedId = make(map[int]bool)
 
+var scanCount int
+var scanSpeed time.Duration
+
 var externalScannerMutex sync.Mutex
 
 func UnmarshalDiscord(responseRaw []byte) *Discord {
@@ -29,8 +32,8 @@ func UnmarshalDiscord(responseRaw []byte) *Discord {
 	return discord
 }
 
-func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*http.Response, error) {
-	//now := time.Now()
+func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*http.Response, time.Duration, error) {
+	now := time.Now()
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   6 * time.Second,
@@ -46,13 +49,12 @@ func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*htt
 
 	response, err := client.Do(req)
 	if err != nil {
-		return response, err
+		return response, 0, err
 	}
 
-	/*	elapsed := time.Since(now)
-		fmt.Println(elapsed)*/
+	elapsed := time.Since(now)
 
-	return response, nil
+	return response, elapsed, nil
 }
 
 func RegexUrlToID(url string) int {
@@ -97,7 +99,7 @@ func ExternalScanner() {
 					continue
 				}
 
-				response, err := MakeRequestExternalScanner(urlLink, transport)
+				response, elapsed, err := MakeRequestExternalScanner(urlLink, transport)
 				if err != nil {
 					continue
 				}
@@ -110,6 +112,15 @@ func ExternalScanner() {
 				if strings.Contains(string(scanner), "rate limited.") {
 					continue
 				}
+
+				if scanCount == 10 {
+					_ = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d - Speed %d", VERSION, threads, scanSpeed.Milliseconds()/10))
+
+					scanSpeed = 0
+					scanCount = 0
+				}
+				scanSpeed += elapsed
+				scanCount++
 
 				pointerDiscord := UnmarshalDiscord(scanner)
 				discord := *pointerDiscord
@@ -127,6 +138,10 @@ func ExternalScanner() {
 					firstExternalScanner = false
 				}
 				externalScannerMutex.Unlock()
+
+				if previousLastId == 0 {
+					break
+				}
 
 				for _, discordData := range discord {
 					if len(discordData.Embeds) <= 0 {

@@ -15,6 +15,7 @@ type Config struct {
 	FreeWebhook string
 	PaidWebhook string
 	Cookie      string
+	OffsaleId   []int
 	LastId      int
 	Proxy       ProxyOptions
 	Options     ConfigOptions

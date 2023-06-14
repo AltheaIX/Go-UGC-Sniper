@@ -19,7 +19,7 @@ func TestUnmarshalDiscord(t *testing.T) {
 		},
 	}
 
-	response, _ := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+	response, _, _ := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 	scanner, _ := ResponseReader(response)
 
 	pointerDiscord := UnmarshalDiscord(scanner)
@@ -59,7 +59,7 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 				return
 			}
 
-			response, err := MakeRequestExternalScanner(urlLink, transport)
+			response, _, err := MakeRequestExternalScanner(urlLink, transport)
 			if err != nil {
 				return
 			}
@@ -77,7 +77,7 @@ func TestMakeRequestExternalScanner(t *testing.T) {
 		},
 	}
 
-	response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+	response, _, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 	if err != nil {
 		t.Error(err)
 	}
@@ -126,7 +126,7 @@ func TestExternalScanner(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	firstExternalScanner = false
-	lastExternalScannerId = 13744629331
+	lastExternalScannerId = 13671730704
 	LoadConfig()
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	go ExternalScanner()

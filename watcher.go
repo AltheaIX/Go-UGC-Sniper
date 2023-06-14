@@ -18,6 +18,8 @@ var watcherId []int
 var newItemId []int
 var sentWebhookItemId = make(map[int]bool)
 
+var endpointItem = []string{"https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories"}
+
 var maxWatcherSize = 120
 
 var notificationMutex sync.Mutex
@@ -83,7 +85,7 @@ func AddToWatcher(sig chan os.Signal) {
 				}
 				watcherMutex.Unlock()
 
-				lastIdFromArray, proxyURL, err := ItemRecentlyAddedAppend(ItemRecentlyAdded())
+				lastIdFromArray, proxyURL, err := ItemRecentlyAddedAppend(ItemRecentlyAdded("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories"))
 
 				if err != nil {
 					if strings.Contains(err.Error(), "context deadline exceeded") {
@@ -112,7 +114,7 @@ func AddToWatcher(sig chan os.Signal) {
 
 				var idsToAdd []int
 				for _, data := range listId {
-					if data == lastItemId {
+					if data <= lastItemId {
 						break
 					}
 

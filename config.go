@@ -75,6 +75,7 @@ func LoadConfig() (Config, error) {
 	freeWebhookUrl = config.FreeWebhook
 	paidWebhookUrl = config.PaidWebhook
 	accountCookie = config.Cookie
+	watcherId = config.OffsaleId
 	proxyAuth = config.Proxy.Enable
 	proxyUsername = config.Proxy.Username
 	proxyPassword = config.Proxy.Password

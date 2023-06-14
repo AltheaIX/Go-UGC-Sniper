@@ -115,7 +115,7 @@ func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 
 // This gonna determine if proxy use authentication or not.
 func BuildProxyURL(proxy string) string {
-	if proxyAuth != true {
+	if proxyAuth != false {
 		return strings.TrimRight("http://"+proxyUsername+":"+proxyPassword+"@"+proxy, "\x00")
 	}
 
