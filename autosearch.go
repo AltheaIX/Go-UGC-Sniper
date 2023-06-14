@@ -20,6 +20,8 @@ func UnmarshalListItem(responseRaw []byte) (*ListItem, error) {
 }
 
 func AllItems() error {
+	defer handlePanic()
+
 	fmt.Println("Autosearch - Please wait, we will get an old offsale items.")
 	listItem := &ListItem{}
 
@@ -68,9 +70,9 @@ func AllItems() error {
 				continue
 			}
 
-			if len(watcherId) == 120 {
+			/*if len(watcherId) == 120 {
 				watcherId = watcherId[:118]
-			}
+			}*/
 
 			watcherId = append(watcherId, data.Id)
 			continue
@@ -127,10 +129,10 @@ func AllItems() error {
 					}
 
 					sort.Sort(sort.Reverse(sort.IntSlice(watcherId)))
-					if len(watcherId) == 120 {
+					/*if len(watcherId) == 120 {
 						watcherId = watcherId[:118]
 						break
-					}
+					}*/
 
 					watcherId = append(watcherId, data.Id)
 					continue
@@ -141,9 +143,10 @@ func AllItems() error {
 				}
 			}
 		}
+		break
 	}
 
-	fmt.Printf("Autosearch - Watching %d of offsale items now.", len(watcherId))
+	fmt.Printf("Autosearch - Watching %d of offsale items now.\n", len(watcherId))
 	fmt.Println("Autosearch - You are ready to go.")
 
 	return nil

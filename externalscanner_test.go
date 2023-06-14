@@ -1,18 +1,25 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"testing"
 )
 
 func TestUnmarshalDiscord(t *testing.T) {
-	url, _ := Decrypt("0rWGcWLnSc02Y2mFsG05tbl1frOBqgCQik8gkamEFeP2pDLfgst7ppOH1pyCMOEE9kUYluyv04dOzT/Q+6ZPduMBnsMBXnACbLcTEeP0YX3j1BBJswfk5Vr0HtVZzOlZ", xKey)
+	_, _ = Decrypt("0rWGcWLnSc02Y2mFsG05tbl1frOBqgCQik8gkamEFeP2pDLfgst7ppOH1pyCMOEE9kUYluyv04dOzT/Q+6ZPduMBnsMBXnACbLcTEeP0YX3j1BBJswfk5Vr0HtVZzOlZ", xKey)
 
-	response, _ := MakeRequestExternalScanner(url)
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	response, _ := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 	scanner, _ := ResponseReader(response)
 
 	pointerDiscord := UnmarshalDiscord(scanner)
@@ -24,6 +31,7 @@ func TestUnmarshalDiscord(t *testing.T) {
 
 func TestMakeRequestExternalScannerProxied(t *testing.T) {
 	err := ReadProxyFromFile("proxy_fresh", true)
+	LoadConfig()
 	t.Log(err)
 
 	semaphore := make(chan struct{}, 10)
@@ -34,12 +42,20 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 			defer func() {
 				<-semaphore
 			}()
-			proxyURL, err := url.Parse(strings.TrimRight("http://"+proxyList[rand.Intn(len(proxyList)-1)], "\x00"))
+
+			proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
 			if err != nil {
 				t.Log(err)
 			}
 
-			response, err := MakeRequestExternalScannerProxied(proxyURL, "https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50")
+			transport := &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			}
+
+			response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 			if err != nil {
 				return
 			}
@@ -51,8 +67,13 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 }
 
 func TestMakeRequestExternalScanner(t *testing.T) {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
 
-	response, err := MakeRequestExternalScanner("")
+	response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 	if err != nil {
 		t.Error(err)
 	}

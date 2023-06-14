@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"math/rand"
@@ -32,24 +31,20 @@ func UnmarshalDiscord(responseRaw []byte) *Discord {
 	return discord
 }
 
-func MakeRequestExternalScanner(urlLink string) (*http.Response, error) {
+func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*http.Response, error) {
 	// now := time.Now()
 	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: 1 * time.Second,
+		Transport: transport,
+		Timeout:   6 * time.Second,
 	}
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
-	authorizationKey, _ := Decrypt("xIJmFB84c2IQ84MdvxZf44oiXDD0Qdmwd/rxpaOFY5jXJMGioMvNOcfKG4E/dJkInsFLOFICGf7JdRlRDJCQbKGOQSZ77GBqLcb77hiPLK0jEo/VRK+QSR35lqubQq11", xKey)
+	// authorizationKey, _ := Decrypt("xIJmFB84c2IQ84MdvxZf44oiXDD0Qdmwd/rxpaOFY5jXJMGioMvNOcfKG4E/dJkInsFLOFICGf7JdRlRDJCQbKGOQSZ77GBqLcb77hiPLK0jEo/VRK+QSR35lqubQq11", xKey)
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Authorization", authorizationKey)
+	req.Header.Set("Authorization", "Njg5MzQ4MDU4MDkzMzIyMjQx.GdTkHL.Cika-mUJjd86moVeZXRF-wcn9eusxzNlxLTmRA")
 	req.Header.Set("Content-Type", "application/json")
 
 	response, err := client.Do(req)
@@ -59,38 +54,6 @@ func MakeRequestExternalScanner(urlLink string) (*http.Response, error) {
 
 	/*elapsed := time.Since(now)
 	fmt.Println(elapsed)*/
-
-	return response, nil
-}
-
-func MakeRequestExternalScannerProxied(proxyURL *url.URL, urlLink string) (*http.Response, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: 6 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", urlLink, nil)
-
-	authorizationKey, _ := Decrypt("xIJmFB84c2IQ84MdvxZf44oiXDD0Qdmwd/rxpaOFY5jXJMGioMvNOcfKG4E/dJkInsFLOFICGf7JdRlRDJCQbKGOQSZ77GBqLcb77hiPLK0jEo/VRK+QSR35lqubQq11", xKey)
-
-	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
-	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Authorization", authorizationKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	response, err := client.Do(req)
-	if err != nil {
-		return response, err
-	}
-
-	if response.StatusCode != 200 {
-		return response, errors.New(fmt.Sprintf("status code is %d", response.StatusCode))
-	}
 
 	return response, nil
 }
@@ -109,6 +72,8 @@ func RegexUrlToID(url string) int {
 }
 
 func ExternalScanner() {
+	defer handlePanic()
+
 	semaphore := make(chan struct{}, threads)
 
 	for {
@@ -118,13 +83,20 @@ func ExternalScanner() {
 				<-semaphore
 			}()
 
-			proxyURL, err := url.Parse(strings.TrimRight("http://"+proxyList[rand.Intn(len(proxyList)-1)], "\x00"))
+			proxyURL, err := url.Parse(BuildProxyURL(proxyList[rand.Intn(len(proxyList)-1)]))
 			if err != nil {
 				return
 			}
 
+			transport := &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			}
+
 			for {
-				response, err := MakeRequestExternalScannerProxied(proxyURL, "https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50")
+				response, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
 				if err != nil {
 					continue
 				}

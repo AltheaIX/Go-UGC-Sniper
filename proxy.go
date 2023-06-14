@@ -18,6 +18,9 @@ import (
 var proxyList []string
 var newProxy []string
 var checkProxy bool
+var proxyAuth bool
+var proxyUsername string
+var proxyPassword string
 
 // Note: if forced setted to true, it means it will check the proxy no matter what
 func ReadProxyFromFile(fileName string, forced bool) error {
@@ -108,6 +111,15 @@ func CheckRequestProxy(wg *sync.WaitGroup, data string) error {
 
 	proxyList = append(proxyList, data)
 	return nil
+}
+
+// This gonna determine if proxy use authentication or not.
+func BuildProxyURL(proxy string) string {
+	if proxyAuth != true {
+		return strings.TrimRight("http://"+proxyUsername+":"+proxyPassword+"@"+proxy, "\x00")
+	}
+
+	return strings.TrimRight("http://"+proxy, "\x00")
 }
 
 func ProxyTester() {

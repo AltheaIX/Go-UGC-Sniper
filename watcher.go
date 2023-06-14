@@ -18,6 +18,8 @@ var watcherId []int
 var newItemId []int
 var sentWebhookItemId = make(map[int]bool)
 
+var maxWatcherSize = 120
+
 var notificationMutex sync.Mutex
 var watcherMutex sync.Mutex
 var pauseChan = make(chan struct{})
@@ -48,6 +50,8 @@ func ReleaseSemaphore(semaphore chan struct{}) {
 }
 
 func AddToWatcher(sig chan os.Signal) {
+	defer handlePanic()
+
 	semaphore := make(chan struct{}, threads)
 	go OffsaleTrackerHandler()
 	go ExternalScanner()
@@ -129,6 +133,8 @@ func AddToWatcher(sig chan os.Signal) {
 }
 
 func NotifierWatcher(notifierType string, data Data) error {
+	defer handlePanic()
+
 	if sentWebhookItemId[data.Id] != false {
 		return errors.New("webhook tried to send more than once")
 	}
@@ -177,13 +183,13 @@ func NotifierWatcher(notifierType string, data Data) error {
 
 		req, err := http.NewRequest("POST", freeWebhookUrl, dataRequest)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		response, err := client.Do(req)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
 		defer response.Body.Close()
 
@@ -232,13 +238,13 @@ func NotifierWatcher(notifierType string, data Data) error {
 
 		req, err := http.NewRequest("POST", paidWebhookUrl, dataRequest)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		response, err := client.Do(req)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
 		defer response.Body.Close()
 		if response.StatusCode != 200 {
@@ -251,9 +257,8 @@ func NotifierWatcher(notifierType string, data Data) error {
 	return nil
 }
 
-func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
-	defer wg.Done()
-	offsaleId := watcherId
+func OffsaleTracker(offsaleId []int, semaphore chan struct{}) {
+	defer handlePanic()
 
 	select {
 	case <-pauseChan:
@@ -266,8 +271,6 @@ func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 			return
 		}
 	default:
-		semaphore <- struct{}{}
-
 		go func(data []int) {
 			defer func() {
 				<-semaphore
@@ -365,15 +368,22 @@ func OffsaleTracker(wg *sync.WaitGroup, semaphore chan struct{}) {
 
 func OffsaleTrackerHandler() {
 	fmt.Println("System - Offsale Tracker activated.")
-	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, threads/2)
 
 	for {
-		wg.Add(1)
+		size := len(watcherId) / maxWatcherSize
 
-		go OffsaleTracker(&wg, semaphore)
+		for i := 0; i < size; i++ {
+			semaphore <- struct{}{}
+			offsaleId := watcherId[(i * maxWatcherSize) : (i+1)*maxWatcherSize]
+			go OffsaleTracker(offsaleId, semaphore)
+		}
 
-		wg.Wait()
+		if len(watcherId) > maxWatcherSize*size {
+			offsaleId := watcherId[maxWatcherSize*size:]
+			semaphore <- struct{}{}
+			go OffsaleTracker(offsaleId, semaphore)
+		}
 	}
 }
 
@@ -394,11 +404,7 @@ func IsFieldSet(s interface{}, fieldName string) bool {
 }
 
 func NotifierWatcherHandler(newItemId []int) {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Printf("Recovered from panic: %v\n", err)
-		}
-	}()
+	defer handlePanic()
 
 	for {
 		details, err := ItemDetailById(newItemId)

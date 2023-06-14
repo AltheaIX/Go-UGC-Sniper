@@ -1,14 +1,21 @@
 package main
 
+type ConfigOptions struct {
+	AlwaysCheckProxy bool
+	Threads          int
+}
+
+type ProxyOptions struct {
+	Enable   bool
+	Username string
+	Password string
+}
+
 type Config struct {
 	FreeWebhook string
 	PaidWebhook string
 	Cookie      string
 	LastId      int
+	Proxy       ProxyOptions
 	Options     ConfigOptions
-}
-
-type ConfigOptions struct {
-	Threads          int
-	AlwaysCheckProxy bool
 }

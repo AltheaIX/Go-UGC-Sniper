@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -80,7 +81,13 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 }
 
 func Sniper(detail *MarketplaceDetail) error {
-	client := &http.Client{Timeout: 600 * time.Millisecond}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	client := &http.Client{Transport: transport, Timeout: 600 * time.Millisecond}
 
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
@@ -111,7 +118,7 @@ func Sniper(detail *MarketplaceDetail) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfToken())
+	req.Header.Set("x-csrf-token", GetCsrfToken(transport))
 	req.AddCookie(cookie)
 
 	now := time.Now()
@@ -154,6 +161,8 @@ func Sniper(detail *MarketplaceDetail) error {
 }
 
 func SniperHandler() {
+	defer handlePanic()
+
 	for _, data := range listFreeItem {
 		for _, dataSniped := range listSnipedItem {
 			if dataSniped == data {

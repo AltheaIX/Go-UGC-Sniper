@@ -5,6 +5,7 @@ import (
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unsafe"
 )
 
 const VERSION = "v1.2.6"
@@ -156,7 +156,8 @@ func AutoUpdate(executePath string) {
 	os.Exit(1)
 }
 
-func setConsoleTitle(title string) error {
+// Comment this for linux build
+/*func setConsoleTitle(title string) error {
 	handle, err := syscall.LoadLibrary("kernel32.dll")
 	if err != nil {
 		return err
@@ -174,9 +175,10 @@ func setConsoleTitle(title string) error {
 	}
 
 	return nil
-}
+}*/
 
-func isDebuggerPresent() {
+// Comment this for linux build
+/*func isDebuggerPresent() {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	procCheckRemoteDebuggerPresent := kernel32.NewProc("CheckRemoteDebuggerPresent")
 	var isDebuggerPresent int32
@@ -190,10 +192,34 @@ func isDebuggerPresent() {
 		time.Sleep(10 * time.Second)
 		os.Exit(1)
 	}
+}*/
+
+func handlePanic() {
+	if r := recover(); r != nil {
+		// Open or create the crash_log.txt file
+		file, err := os.OpenFile("crash_log.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+
+		// Set the log output to the crash_log.txt file
+		log.SetOutput(file)
+
+		// Log the panic details to crash_log.txt
+		log.Printf("Panic occurred: %v", r)
+
+		// Re-panic to ensure the program terminates
+		panic(r)
+	}
 }
 
 func main() {
-	isDebuggerPresent()
+	log.SetFlags(log.LstdFlags)
+	defer handlePanic()
+
+	// Comment this for linux build
+	// isDebuggerPresent()
 
 	executePath, err := os.Executable()
 	if err != nil {
@@ -206,10 +232,11 @@ func main() {
 
 	config, err := LoadConfig()
 
-	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
-	if err != nil {
-		panic(err)
-	}
+	// Comment this for linux build
+	/*	err = setConsoleTitle(fmt.Sprintf("Go UGC Sniper - Beta Version - %v - Threads %d", VERSION, threads))
+		if err != nil {
+			panic(err)
+		}*/
 
 	database, err := ReadFirebase()
 	if err != nil {

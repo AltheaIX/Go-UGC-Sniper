@@ -3,13 +3,35 @@ package main
 import (
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
+	"math/rand"
 	"strings"
 	"sync"
 	"testing"
 )
 
 func TestAddToWatcher(t *testing.T) {
-	// AddToWatcher()
+	generateIDs := []int{}
+	maxSize := 120
+
+	for i := 0; i < 490; {
+		randomValue := rand.Intn(200000)
+		if IsExist(generateIDs, randomValue) {
+			continue
+		}
+
+		generateIDs = append(generateIDs, randomValue)
+		i++
+	}
+
+	size := len(generateIDs) / maxSize
+
+	for i := 0; i < size; i++ {
+		t.Log(generateIDs[(i*maxSize):(i+1)*maxSize], len(generateIDs[(i*maxSize):(i+1)*maxSize]))
+	}
+
+	if len(generateIDs) > maxSize*size {
+		t.Log(generateIDs[maxSize*size:])
+	}
 }
 
 func TestReleaseSemaphore(t *testing.T) {
