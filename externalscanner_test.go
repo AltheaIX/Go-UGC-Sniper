@@ -1,9 +1,7 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strconv"
 	"sync"
@@ -13,13 +11,7 @@ import (
 func TestUnmarshalDiscord(t *testing.T) {
 	_, _ = Decrypt("0rWGcWLnSc02Y2mFsG05tbl1frOBqgCQik8gkamEFeP2pDLfgst7ppOH1pyCMOEE9kUYluyv04dOzT/Q+6ZPduMBnsMBXnACbLcTEeP0YX3j1BBJswfk5Vr0HtVZzOlZ", xKey)
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	response, _, _ := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+	response, _, _ := MakeRequestExternalScanner("")
 	scanner, _ := ResponseReader(response)
 
 	pointerDiscord := UnmarshalDiscord(scanner)
@@ -48,18 +40,12 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 				t.Log(err)
 			}*/
 
-			transport := &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			}
-
 			urlLink, err := Decrypt("3xkarmSuNsZFHzgRcKyj2YO2zEQE/mSqEuB0ob5CvMH71p51egAdvAFIQif+WC79mzGBnUos64nWAJn1uLHxDQ==", xKey)
 			if err != nil {
 				return
 			}
 
-			response, _, err := MakeRequestExternalScanner(urlLink, transport)
+			response, _, err := MakeRequestExternalScanner(urlLink)
 			if err != nil {
 				return
 			}
@@ -71,13 +57,7 @@ func TestMakeRequestExternalScannerProxied(t *testing.T) {
 }
 
 func TestMakeRequestExternalScanner(t *testing.T) {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	response, _, err := MakeRequestExternalScanner("https://discord.com/api/v9/channels/1094291863332192376/messages?limit=50", transport)
+	response, _, err := MakeRequestExternalScanner("")
 	if err != nil {
 		t.Error(err)
 	}

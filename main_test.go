@@ -54,7 +54,7 @@ func TestIsExist(t *testing.T) {
 func TestItemDetailByIdProxied(t *testing.T) {
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	for {
-		responseByte, err := ItemDetailByIdProxied([]int{123123, 12412312})
+		responseByte, err := ItemDetailByIdProxied([]int{13727438906, 13727438906})
 		if err != nil {
 			fmt.Println(err)
 		}

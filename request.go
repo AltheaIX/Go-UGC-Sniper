@@ -11,18 +11,20 @@ import (
 	"time"
 )
 
-func GetCsrfTokenProxied(proxyURL *url.URL) string {
+var transport = &http.Transport{MaxIdleConns: 100, MaxIdleConnsPerHost: 100, DisableKeepAlives: false, IdleConnTimeout: 10 * time.Second, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+var client = &http.Client{Timeout: 6 * time.Second, Transport: transport}
+
+func GetCsrfTokenProxied(proxyURL *url.URL) (string, error) {
 	var token string
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+	transport = &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
 		},
-		Timeout: 6 * time.Second,
 	}
+
+	client.Transport = transport
 
 	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
 	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
@@ -30,7 +32,7 @@ func GetCsrfTokenProxied(proxyURL *url.URL) string {
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
 		// fmt.Printf("Error: %v - GetCsrfToken\n", err)
-		return token
+		return token, err
 	}
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
@@ -41,7 +43,7 @@ func GetCsrfTokenProxied(proxyURL *url.URL) string {
 	response, err := client.Do(req)
 	if err != nil {
 		//fmt.Printf("Error: %v - GetCsrfToken\n", err)
-		return token
+		return token, err
 	}
 	defer response.Body.Close()
 
@@ -50,12 +52,11 @@ func GetCsrfTokenProxied(proxyURL *url.URL) string {
 	}
 
 	time.Sleep(0 * time.Second)
-	return token
+	return token, nil
 }
 
 func GetCsrfToken() string {
 	var token string
-	client := &http.Client{Timeout: 3 * time.Second}
 
 	cookie := &http.Cookie{
 		Name:    ".ROBLOSECURITY",
@@ -102,15 +103,14 @@ func ItemRecentlyAdded(urlLink string) ([]byte, *url.URL, error) {
 		panic(err)
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+	transport = &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
 		},
-		Timeout: 6 * time.Second,
 	}
+
+	client.Transport = transport
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
@@ -147,17 +147,14 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 		panic(err)
 	}
 
-	transport := &http.Transport{
+	transport = &http.Transport{
 		Proxy: http.ProxyURL(proxyURL),
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
 	}
 
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   6 * time.Second,
-	}
+	client.Transport = transport
 
 	var items []OffsaleItems
 
@@ -168,8 +165,14 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	payload := &OffsalePayload{Items: items}
 	jsonPayload, _ := json.Marshal(payload)
 	dataRequest := bytes.NewBuffer(jsonPayload)
+	fmt.Println(string(jsonPayload))
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
+	if err != nil {
+		return itemDetail, err
+	}
+
+	csrf, err := GetCsrfTokenProxied(proxyURL)
 	if err != nil {
 		return itemDetail, err
 	}
@@ -177,7 +180,8 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("x-csrf-token", GetCsrfTokenProxied(proxyURL))
+	req.Header.Set("x-csrf-token", csrf)
+	fmt.Println(csrf)
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -185,12 +189,13 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	}
 	defer response.Body.Close()
 
+	scanner, _ := ResponseReader(response)
 	if response.StatusCode != 200 {
+		fmt.Println(string(scanner), response.StatusCode)
 		err = errors.New("status code is not 200")
 		return itemDetail, err
 	}
 
-	scanner, _ := ResponseReader(response)
 	itemDetail, err = UnmarshalCatalog(scanner)
 	if err != nil {
 		return itemDetail, err
@@ -206,8 +211,6 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	itemDetail := &ItemDetail{}
 	var err error
-
-	client := &http.Client{Timeout: 3 * time.Second}
 
 	cookie := &http.Cookie{
 		Name:    ".ROBLOSECURITY",
@@ -240,10 +243,10 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 
 	response, err := client.Do(req)
 	if err != nil {
+		fmt.Print("error on line 238")
 		return itemDetail, err
 	}
 	defer response.Body.Close()
-
 	scanner, _ := ResponseReader(response)
 
 	if response.StatusCode != 200 {
@@ -252,6 +255,7 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 			callingFunc := runtime.FuncForPC(pc).Name()
 			fmt.Println(string(scanner), callingFunc, line)*/
 		fmt.Println(string(scanner))
+		fmt.Print("error on line 250")
 		err = errors.New("status code is not 200")
 		return itemDetail, err
 	}
@@ -266,7 +270,6 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 }
 
 func ItemThumbnailImageById(assetId int) (string, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
 	urlBuilder := fmt.Sprintf("https://thumbnails.roblox.com/v1/assets?assetIds=%d&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false", assetId)
 	data := &ItemDetail{}
 
@@ -289,15 +292,6 @@ func ItemThumbnailImageById(assetId int) (string, error) {
 }
 
 func MakeRequest(url string) (*http.Response, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: 6 * time.Second,
-	}
-
 	req, err := http.NewRequest("GET", url, nil)
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")

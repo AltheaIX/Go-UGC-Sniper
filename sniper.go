@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -33,8 +32,6 @@ func UnmarshalMarketplaceDetail(responseRaw []byte) *MarketplaceDetail {
 }
 
 func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*MarketplaceDetail, error) {
-	client := &http.Client{Timeout: 600 * time.Millisecond}
-
 	jsonPayload := fmt.Sprintf(`{"itemIds": ["%v"]}`, collectibleItemId)
 	dataRequest := bytes.NewBuffer([]byte(jsonPayload))
 
@@ -82,14 +79,6 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 }
 
 func Sniper(detail *MarketplaceDetail) error {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	client := &http.Client{Transport: transport, Timeout: 2000 * time.Millisecond}
-
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
 	"expectedCurrency": 1,

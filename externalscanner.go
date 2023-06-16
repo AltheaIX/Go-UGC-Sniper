@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"net/http"
@@ -32,12 +31,8 @@ func UnmarshalDiscord(responseRaw []byte) *Discord {
 	return discord
 }
 
-func MakeRequestExternalScanner(urlLink string, transport *http.Transport) (*http.Response, time.Duration, error) {
+func MakeRequestExternalScanner(urlLink string) (*http.Response, time.Duration, error) {
 	now := time.Now()
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   6 * time.Second,
-	}
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
@@ -73,7 +68,7 @@ func RegexUrlToID(url string) int {
 func ExternalScanner() {
 	defer handlePanic()
 
-	semaphore := make(chan struct{}, 3)
+	semaphore := make(chan struct{}, 1)
 
 	for {
 		semaphore <- struct{}{}
@@ -87,19 +82,13 @@ func ExternalScanner() {
 				return
 			}*/
 
-			transport := &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			}
-
 			for {
 				urlLink, err := Decrypt("3xkarmSuNsZFHzgRcKyj2YO2zEQE/mSqEuB0ob5CvMH71p51egAdvAFIQif+WC79mzGBnUos64nWAJn1uLHxDQ==", xKey)
 				if err != nil {
 					continue
 				}
 
-				response, elapsed, err := MakeRequestExternalScanner(urlLink, transport)
+				response, elapsed, err := MakeRequestExternalScanner(urlLink)
 				if err != nil {
 					continue
 				}
