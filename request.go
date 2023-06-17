@@ -14,17 +14,11 @@ import (
 var transport = &http.Transport{MaxIdleConns: 100, MaxIdleConnsPerHost: 100, DisableKeepAlives: false, IdleConnTimeout: 10 * time.Second, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 var client = &http.Client{Timeout: 6 * time.Second, Transport: transport}
 
-func GetCsrfTokenProxied(proxyURL *url.URL) (string, error) {
+func GetCsrfTokenProxied(proxyURL *url.URL) string {
 	var token string
 
-	transport = &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	client.Transport = transport
+	proxiedTransport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	proxiedClient := &http.Client{Timeout: 6 * time.Second, Transport: proxiedTransport}
 
 	jsonRequest := fmt.Sprintf(`{"items":[{"itemType": 1, "id": %x}]}`, 13177094956)
 	dataRequest := bytes.NewBuffer([]byte(jsonRequest))
@@ -32,27 +26,25 @@ func GetCsrfTokenProxied(proxyURL *url.URL) (string, error) {
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
 		// fmt.Printf("Error: %v - GetCsrfToken\n", err)
-		return token, err
+		return token
 	}
 
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-csrf-token", "xcsrf")
+	req.Header.Set("x-csrf-token", "s/BoATPEOLnW")
 
-	response, err := client.Do(req)
+	response, err := proxiedClient.Do(req)
 	if err != nil {
 		//fmt.Printf("Error: %v - GetCsrfToken\n", err)
-		return token, err
+		return token
 	}
 	defer response.Body.Close()
 
 	if response.Header.Get("x-csrf-token") != "" {
 		token = response.Header.Get("x-csrf-token")
 	}
-
-	time.Sleep(0 * time.Second)
-	return token, nil
+	return token
 }
 
 func GetCsrfToken() string {
@@ -103,14 +95,8 @@ func ItemRecentlyAdded(urlLink string) ([]byte, *url.URL, error) {
 		panic(err)
 	}
 
-	transport = &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	client.Transport = transport
+	proxiedTransport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	proxiedClient := &http.Client{Timeout: 6 * time.Second, Transport: proxiedTransport}
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
@@ -118,7 +104,7 @@ func ItemRecentlyAdded(urlLink string) ([]byte, *url.URL, error) {
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Content-Type", "application/json")
 
-	response, err := client.Do(req)
+	response, err := proxiedClient.Do(req)
 	if err != nil {
 		return nil, proxyURL, err
 	}
@@ -147,14 +133,8 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 		panic(err)
 	}
 
-	transport = &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	client.Transport = transport
+	proxiedTransport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	proxiedClient := &http.Client{Timeout: 6 * time.Second, Transport: proxiedTransport}
 
 	var items []OffsaleItems
 
@@ -172,7 +152,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 		return itemDetail, err
 	}
 
-	csrf, err := GetCsrfTokenProxied(proxyURL)
+	csrf := GetCsrfTokenProxied(proxyURL)
 	if err != nil {
 		return itemDetail, err
 	}
@@ -183,7 +163,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	req.Header.Set("x-csrf-token", csrf)
 	fmt.Println(csrf)
 
-	response, err := client.Do(req)
+	response, err := proxiedClient.Do(req)
 	if err != nil {
 		return itemDetail, err
 	}
