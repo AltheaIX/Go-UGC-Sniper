@@ -54,8 +54,6 @@ func TestReleaseSemaphore(t *testing.T) {
 				semaphore <- struct{}{}
 				wg.Add(1)
 				fmt.Println("Worker started")
-
-				pauseGoroutines()
 			}()
 		}
 	}

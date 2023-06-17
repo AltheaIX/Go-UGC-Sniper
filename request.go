@@ -43,6 +43,7 @@ func GetCsrfTokenProxied(proxyURL *url.URL) string {
 
 	if response.Header.Get("x-csrf-token") != "" {
 		token = response.Header.Get("x-csrf-token")
+		// fmt.Printf("%v-Got Csrf: %v\n", proxyURL, token)
 	}
 	return token
 }
@@ -100,6 +101,8 @@ func ItemRecentlyAdded(urlLink string) ([]byte, *url.URL, error) {
 
 	req, err := http.NewRequest("GET", urlLink, nil)
 
+	req.WithContext(globalCtx)
+
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("Content-Type", "application/json")
@@ -145,23 +148,24 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 	payload := &OffsalePayload{Items: items}
 	jsonPayload, _ := json.Marshal(payload)
 	dataRequest := bytes.NewBuffer(jsonPayload)
-	fmt.Println(string(jsonPayload))
 
 	req, err := http.NewRequest("POST", "https://catalog.roblox.com/v1/catalog/items/details", dataRequest)
 	if err != nil {
 		return itemDetail, err
 	}
 
+	req.WithContext(globalCtx)
+
 	csrf := GetCsrfTokenProxied(proxyURL)
-	if err != nil {
-		return itemDetail, err
+	if csrf == "" {
+		return itemDetail, errors.New("csrf value is null")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "PostmanRuntime/7.29.0")
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.Set("x-csrf-token", csrf)
-	fmt.Println(csrf)
+	// fmt.Printf("%v-Used Csrf: %v\n", proxyURL, csrf)
 
 	response, err := proxiedClient.Do(req)
 	if err != nil {
@@ -171,7 +175,7 @@ func ItemDetailByIdProxied(assetId []int) (*ItemDetail, error) {
 
 	scanner, _ := ResponseReader(response)
 	if response.StatusCode != 200 {
-		fmt.Println(string(scanner), response.StatusCode)
+		// fmt.Printf("%v-Expected Csrf: %v\n", proxyURL, response.Header.Get("x-csrf-token"))
 		err = errors.New("status code is not 200")
 		return itemDetail, err
 	}
@@ -214,6 +218,8 @@ func ItemDetailById(assetId []int) (*ItemDetail, error) {
 	if err != nil {
 		panic(err)
 	}
+
+	req.WithContext(globalCtx)
 	req.AddCookie(cookie)
 
 	req.Header.Set("Content-Type", "application/json")

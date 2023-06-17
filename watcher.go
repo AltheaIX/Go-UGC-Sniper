@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
@@ -25,20 +26,13 @@ var maxWatcherSize = 120
 var notificationMutex sync.Mutex
 var watcherMutex sync.Mutex
 var pauseChan = make(chan struct{})
-var pauseFlag bool
 
 var freeWebhookUrl string
 var paidWebhookUrl string
 var threads int
 
-func pauseGoroutines() {
-	pauseChan <- struct{}{}
-}
-
 func resumeGoroutines() {
-	watcherMutex.Lock()
-	pauseFlag = false
-	watcherMutex.Unlock()
+	globalCtx, globalCancel = context.WithCancel(context.Background())
 }
 
 func ReleaseSemaphore(semaphore chan struct{}) {
@@ -62,28 +56,14 @@ func AddToWatcher(sig chan os.Signal) {
 		case <-sig:
 			fmt.Println("Termination signal received.")
 			return
-		case <-pauseChan:
-			watcherMutex.Lock()
-			isPaused := pauseFlag
-			watcherMutex.Unlock()
-			if isPaused {
-				ReleaseSemaphore(semaphore)
-				<-pauseChan // Wait for resume signal before continuing
-				continue
-			}
+		case <-globalCtx.Done():
+			return
 		default:
 			semaphore <- struct{}{}
 			go func(semaphore chan struct{}, newItemId []int) {
 				defer func() {
 					<-semaphore
 				}()
-
-				watcherMutex.Lock()
-				if pauseFlag {
-					watcherMutex.Unlock()
-					return
-				}
-				watcherMutex.Unlock()
 
 				lastIdFromArray, proxyURL, err := ItemRecentlyAddedAppend(ItemRecentlyAdded("https://catalog.roblox.com/v1/search/items?category=Accessories&includeNotForSale=true&keyword=orange+teal+cyan+red+green+topaz+yellow+purple+war&limit=120&salesTypeFilter=1&sortType=3&subcategory=Accessories"))
 
@@ -263,15 +243,8 @@ func OffsaleTracker(offsaleId []int, semaphore chan struct{}) {
 	defer handlePanic()
 
 	select {
-	case <-pauseChan:
-		watcherMutex.Lock()
-		isPaused := pauseFlag
-		watcherMutex.Unlock()
-		if isPaused {
-			ReleaseSemaphore(semaphore)
-			<-pauseChan // Wait for resume signal before continuing
-			return
-		}
+	case <-globalCtx.Done():
+		return
 	default:
 		go func(data []int) {
 			defer func() {
@@ -283,13 +256,6 @@ func OffsaleTracker(offsaleId []int, semaphore chan struct{}) {
 					fmt.Printf("Recovered from panic: %v\n", err)
 				}
 			}()
-
-			watcherMutex.Lock()
-			if pauseFlag {
-				watcherMutex.Unlock()
-				return
-			}
-			watcherMutex.Unlock()
 
 			for {
 				details, err := ItemDetailByIdProxied(offsaleId)
@@ -345,9 +311,8 @@ func OffsaleTracker(offsaleId []int, semaphore chan struct{}) {
 					watcherMutex.Unlock()
 
 					if data.SaleLocationType != "ExperiencesDevApiOnly" {
-						pauseGoroutines()
 						listFreeItem = append(listFreeItem, data.CollectibleItemId)
-						SniperHandler()
+						SniperHandler("Tracker")
 					}
 
 					if sentWebhookItemId[data.Id] != true {
@@ -454,9 +419,8 @@ func NotifierWatcherHandler(newItemId []int) {
 			}
 
 			if data.SaleLocationType != "ExperiencesDevApiOnly" {
-				pauseGoroutines()
 				listFreeItem = append(listFreeItem, data.CollectibleItemId)
-				SniperHandler()
+				SniperHandler("Watcher")
 			}
 
 			data.Image, err = ItemThumbnailImageById(data.Id)
@@ -472,14 +436,14 @@ func NotifierWatcherHandler(newItemId []int) {
 	}
 }
 
-func BoughtNotifier(name jsoniter.RawMessage) {
+func BoughtNotifier(name jsoniter.RawMessage, source string) {
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	webhookBuilder := fmt.Sprintf(`{
-	  "content": "Bought **%s** on **%v**",
+	  "content": "Bought **%s** on **%v** - From %v",
 	  "embeds": null,
 	  "attachments": []
-	}`, name, username)
+	}`, name, username, source)
 	dataRequest := bytes.NewBuffer([]byte(webhookBuilder))
 
 	fmt.Println(webhookBuilder)

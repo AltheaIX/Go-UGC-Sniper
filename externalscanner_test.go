@@ -106,7 +106,7 @@ func TestExternalScanner(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	firstExternalScanner = false
-	lastExternalScannerId = 13671730704
+	lastExternalScannerId = 13772093317
 	LoadConfig()
 	_ = ReadProxyFromFile("proxy_fresh", true)
 	go ExternalScanner()

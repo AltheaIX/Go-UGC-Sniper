@@ -78,7 +78,7 @@ func MarketplaceDetailByCollectibleItemId(collectibleItemId string) (*Marketplac
 	return marketplaceDetail, err
 }
 
-func Sniper(detail *MarketplaceDetail) error {
+func Sniper(detail *MarketplaceDetail, source string) error {
 	jsonPayload := fmt.Sprintf(`{
 	"collectibleItemId": "%v",
 	"expectedCurrency": 1,
@@ -144,13 +144,14 @@ func Sniper(detail *MarketplaceDetail) error {
 		return err
 	}
 
-	go BoughtNotifier(detail.Data[0].Name)
+	go BoughtNotifier(detail.Data[0].Name, source)
 	time.Sleep(1 * time.Second)
 	return nil
 }
 
-func SniperHandler() {
+func SniperHandler(source string) {
 	defer handlePanic()
+	globalCancel()
 
 	for _, data := range listFreeItem {
 		var detail *MarketplaceDetail
@@ -186,7 +187,7 @@ func SniperHandler() {
 			detail.Data[0].Name = jsoniter.RawMessage(_name)
 
 			fmt.Printf("Sniper - Sniping items %s\n", detail.Data[0].Name)
-			err = Sniper(detail)
+			err = Sniper(detail, source)
 			if err != nil && err.Error() == "sold out" {
 				fmt.Printf("Sniper - %s already sold out.\n", detail.Data[0].Name)
 				listFreeItem = DeleteSlice(listFreeItem, data)
